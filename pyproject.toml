@@ -1,6 +1,6 @@
 [project]
 name = "trobz_local"
-version = "0.0.1"
+version = "1.0.0"
 description = ""
 authors = [{name = "trisdoan", email = "doaminhtri8183@gmail.com"}]
 requires-python = ">=3.10"
