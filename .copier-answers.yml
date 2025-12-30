@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v1.0.2
+_src_path: https://github.com/trobz/trobz-python-template.git
+author_email: doaminhtri8183@gmail.com
+author_username: trisdoan
+enable_github_action: true
+package_name: trobz_local
+project_description: ''
+project_name: trobz_local
+publish_to_pypi: false
+repository_name: local.py
+repository_namespace: trobz

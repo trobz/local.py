@@ -1,0 +1,437 @@
+import os
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Annotated
+
+import git
+import typer
+from rich import print as rprint
+from rich.progress import Progress, TaskID
+from rich.tree import Tree
+
+from .concurrency import run_tasks
+from .utils import (
+    ARCH_PACKAGES,
+    MACOS_PACKAGES,
+    UBUNTU_PACKAGES,
+    GitProgress,
+    confirm_step,
+    get_config,
+    get_os_info,
+    get_uv_path,
+)
+
+app = typer.Typer()
+
+ODOO_URLS = {
+    "odoo": "git@github.com:odoo/odoo.git",
+    "enterprise": "git@github.com:odoo/enterprise.git",
+}
+
+
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    newcomer: bool = typer.Option(
+        True,
+        help="Enable newcomer mode with confirmations and help.",
+        envvar="NEWCOMER_MODE",
+    ),
+):
+    """
+    Hi, I'm a CLI to help you setup and manage your local environment for Odoo development.
+    """
+    ctx.ensure_object(dict)
+    ctx.obj["newcomer"] = newcomer
+    if ctx.invoked_subcommand is None:
+        _run_init(ctx)
+
+
+@app.command()
+def init(ctx: typer.Context):
+    _run_init(ctx)
+
+
+def _run_init(ctx: typer.Context):
+    confirm_step(
+        ctx,
+        "This command will create the basic directory structure for your local development environment inside '~/code'",
+        "init",
+    )
+    config = get_config()
+    dirs = [
+        "~/code/venvs",
+        "~/code/oca",
+        "~/code/odoo",
+        "~/code/odoo/odoo",
+        "~/code/odoo/enterprise",
+        "~/code/trobz/projects",
+        "~/code/trobz/packages",
+    ]
+    for d in dirs:
+        d = os.path.expanduser(d)
+        os.makedirs(d, exist_ok=True)
+
+    odoo_versions = config.get("versions")
+    if not odoo_versions:
+        typer.echo("versions not found in config file.")
+        raise typer.Exit(code=1)
+
+    for version in odoo_versions:
+        os.makedirs(os.path.expanduser(f"~/code/oca/{version}"), exist_ok=True)
+
+    root_path = Path(os.path.expanduser("~/code"))
+    typer.secho("Required directories are created successfully.", fg=typer.colors.GREEN)
+    tree = Tree(f"[bold yellow]{root_path}[/bold yellow]")
+
+    tree.add("venvs [dim]# Virtual environments[/dim]")
+
+    oca_tree = tree.add("oca [dim]# OCA repositories[/dim]")
+    for version in odoo_versions:
+        oca_tree.add(f"{version}")
+
+    odoo_tree = tree.add("odoo [dim]# Odoo source code[/dim]")
+    community = odoo_tree.add("odoo [dim]# Odoo Community[/dim]")
+    for version in odoo_versions:
+        community.add(f"{version}")
+    ent = odoo_tree.add("enterprise [dim]# Odoo Enterprise[/dim]")
+    for version in odoo_versions:
+        ent.add(f"{version}")
+
+    trobz_tree = tree.add("trobz [dim]# Trobz repositories[/dim]")
+    trobz_tree.add("projects")
+    trobz_tree.add("packages [dim]# Internal packages[/dim]")
+    rprint(tree)
+
+
+@app.command()
+def pull_repos(  # noqa: C901
+    ctx: typer.Context,
+    repo_filter: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--filter",
+            "-f",
+            help="Filter by repo name. Can be used multiple times.",
+        ),
+    ] = None,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Prints actions without running."),
+):
+    """
+    Pull/clone Odoo and OCA repos based on config
+    """
+    config = get_config()
+    odoo_versions = config.get("versions", [])
+    repos_config = config.get("repos", {})
+    code_root = Path.home() / "code"
+
+    repo_infos_for_tasks = _get_tasks(odoo_versions, repos_config, code_root, repo_filter)
+
+    if not repo_infos_for_tasks:
+        return
+
+    # Group tasks by repo_name
+    tasks_by_repo = {}
+    for task in repo_infos_for_tasks:
+        tasks_by_repo.setdefault(task["repo_name"], []).append(task)
+
+    msg = "This command will clone/pull the following repositories:\n"
+    for repo_name, repo_tasks in tasks_by_repo.items():
+        msg += f"\n{repo_name}:\n"
+        for task in repo_tasks:
+            try:
+                repo_path_display = f"~/{task['repo_path'].relative_to(Path.home())}"
+            except ValueError:
+                repo_path_display = str(task["repo_path"])
+
+            msg += f"- {task['version']} -> {repo_path_display}\n"
+    msg += "\nEnsuring your local code is up to date."
+
+    confirm_step(
+        ctx,
+        msg,
+        "pull-repos",
+    )
+
+    if dry_run:
+        for repo_info in repo_infos_for_tasks:
+            action = "Clone" if not repo_info["repo_path"].exists() else "Pull"
+            typer.echo(f"- {action} {repo_info['repo_name']} (branch: {repo_info['version']})")
+        return
+
+    concurrency_tasks = []
+    for repo_info in repo_infos_for_tasks:
+        concurrency_tasks.append({
+            "name": f"{repo_info['repo_name']} ({repo_info['version']})",
+            "func": _pull_repo,
+            "args": {"repo_info": repo_info},
+        })
+
+    results = run_tasks(concurrency_tasks)
+    failed_tasks = [res for res in results if not res.success]
+    if failed_tasks:
+        typer.secho("\n--- Some repository operations failed ---", fg=typer.colors.RED)
+        for res in failed_tasks:
+            typer.secho(f"✗ {res.name}: {res.message}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    else:
+        typer.secho("\nAll repositories updated successfully.", fg=typer.colors.GREEN)
+
+
+def _get_tasks(odoo_versions, repos_config, code_root, repo_filter):
+    tasks = []
+    for version in odoo_versions:
+        if "odoo" in repos_config:
+            for repo_name in repos_config["odoo"]:
+                if repo_name in ODOO_URLS and (not repo_filter or repo_name in repo_filter):
+                    tasks.append({
+                        "repo_name": repo_name,
+                        "repo_path": code_root / "odoo" / repo_name / version,
+                        "repo_url": ODOO_URLS[repo_name],
+                        "version": str(version),
+                    })
+        if "oca" in repos_config:
+            for repo_name in repos_config["oca"]:
+                if not repo_filter or repo_name in repo_filter:
+                    tasks.append({
+                        "repo_name": repo_name,
+                        "repo_path": code_root / "oca" / str(version) / repo_name,
+                        "repo_url": f"git@github.com:OCA/{repo_name}.git",
+                        "version": str(version),
+                    })
+    return tasks
+
+
+def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict):
+    repo_name = repo_info["repo_name"]
+    repo_path = repo_info["repo_path"]
+    repo_url = repo_info["repo_url"]
+    version = repo_info["version"]
+
+    try:
+        progress.update(task_id, description=f"Processing {repo_name} ({version})", total=100, completed=0)
+        if not repo_path.exists():
+            progress.update(task_id, description=f"Cloning {repo_name} ({version})")
+            repo_path.parent.mkdir(parents=True, exist_ok=True)
+            git.Repo.clone_from(
+                repo_url,
+                to_path=repo_path,
+                branch=version,
+                progress=GitProgress(progress, task_id, f"Cloning {repo_name} {version}"),  # ty: ignore[invalid-argument-type]
+                depth=1,
+            )
+        else:
+            progress.update(task_id, description=f"Fetching {repo_name} ({version})")
+            repo = git.Repo(repo_path)
+            origin = repo.remotes.origin
+            origin.fetch(version)
+            repo.heads[version].checkout()
+            repo.git.reset("--hard", f"origin/{version}")
+
+        progress.update(task_id, description=f"✓ {repo_name} ({version}) updated.", completed=100, total=100)
+
+    except git.exc.InvalidGitRepositoryError as e:
+        progress.update(task_id, description=f"[red]✗ Error {repo_name} ({version}): Not a git repository: {e}")
+        raise
+    except git.exc.GitCommandError as e:
+        progress.update(task_id, description=f"[red]✗ Error {repo_name} ({version}): {e.stderr.strip()}")
+        raise
+    except Exception as e:
+        progress.update(task_id, description=f"[red]✗ Error {repo_name} ({version}): {e}")
+        raise  # to be caught by run_tasks
+
+
+@app.command()
+def install_tools(ctx: typer.Context):
+    """
+    Install tools using uv tool based on config.
+    """
+    config = get_config()
+    tools = config.get("tools", [])
+
+    if not tools:
+        typer.echo("No tools found in config.")
+        return
+
+    msg = "This command will install the following command-line tools using 'uv':\n\n"
+    for tool in tools:
+        msg += f"- {tool}\n"
+
+    confirm_step(
+        ctx,
+        msg,
+        "install-tools",
+    )
+
+    uv_path = get_uv_path()
+
+    for tool in tools:
+        try:
+            subprocess.run(  # noqa: S603 - tool input is safely checked above
+                [uv_path, "tool", "install", "--", tool],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            typer.secho(f"✓ {tool} installed successfully.", fg=typer.colors.GREEN)
+        except subprocess.CalledProcessError as e:
+            typer.secho(f"✗ Error installing {tool}: {e.stderr.strip()}", fg=typer.colors.RED)
+
+
+@app.command()
+def create_venvs(ctx: typer.Context):
+    """
+    Create virtual environments for Odoo versions using odoo-venv.
+    """
+    config = get_config()
+    versions = config.get("versions", [])
+
+    if not versions:
+        typer.echo("No versions found in config.")
+        return
+
+    msg = (
+        "This command will create Python virtual environments for the following Odoo versions "
+        "using 'odoo-venv' with the 'demo' preset, using Python '3.12':\n\n"
+    )
+    for version in versions:
+        msg += f"- {version} -> ~/code/venvs/{version}\n"
+
+    msg += "\nTo activate a virtual environment manually, run:\n"
+    msg += "[bold cyan]source ~/code/venvs/<version>/bin/activate[/bold cyan]\n"
+
+    msg += "\nFor more information, read at https://github.com/trobz/odoo-venv."
+
+    confirm_step(
+        ctx,
+        msg,
+        "create-venvs",
+    )
+
+    uv_path = get_uv_path()
+    code_root = Path.home() / "code"
+    odoo_dir_base = code_root / "odoo" / "odoo"
+    venv_dir_base = code_root / "venvs"
+
+    concurrency_tasks = []
+    for version in versions:
+        concurrency_tasks.append({
+            "name": f"venv-{version}",
+            "func": _create_venvs,
+            "args": {
+                "version": version,
+                "uv_path": uv_path,
+                "odoo_dir_base": odoo_dir_base,
+                "venv_dir_base": venv_dir_base,
+            },
+        })
+    results = run_tasks(concurrency_tasks)
+    failed_tasks = [res for res in results if not res.success]
+    if failed_tasks:
+        typer.secho("\n--- Some virtual environment operations failed ---", fg=typer.colors.RED)
+        for res in failed_tasks:
+            error_message = f"✗ {res.name}: {res.message}"
+            typer.secho(error_message, fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    else:
+        typer.secho("\nAll virtual environments created successfully.", fg=typer.colors.GREEN)
+
+
+def _create_venvs(
+    progress: Progress, task_id: TaskID, version: str, uv_path: str, odoo_dir_base: Path, venv_dir_base: Path
+):
+    progress.update(task_id, description=f"Creating venv for {version}...", total=100, completed=0, start=True)
+    odoo_dir = odoo_dir_base / version
+    venv_dir = venv_dir_base / version
+
+    try:
+        cmd = [
+            uv_path,
+            "tool",
+            "run",
+            "odoo-venv",
+            version,
+            "--odoo-dir",
+            str(odoo_dir),
+            "--venv-dir",
+            str(venv_dir),
+            "--preset",
+            "demo",
+            "-p",
+            "3.12",
+        ]
+
+        subprocess.run(  # noqa: S603
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        progress.update(task_id, description=f"✓ Venv for {version} created.", completed=100)
+    except subprocess.CalledProcessError as e:
+        progress.update(task_id, description=f"[red]✗ Error venv {version}: {e.stderr.strip()}")
+        raise
+    except Exception as e:
+        progress.update(task_id, description=f"[red]✗ Error venv {version}: {e}")
+        raise
+
+
+@app.command()
+def install_packages(ctx: typer.Context):
+    """
+    Install system-wide packages required.
+    """
+    os_info = get_os_info()
+    system = os_info["system"]
+    distro = os_info["distro"]
+
+    cmd = []
+    packages = []
+
+    if system == "Darwin":
+        if not shutil.which("brew"):
+            typer.secho("Error: Homebrew is not installed. Please install it first.", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        cmd = ["brew", "install"]
+        packages = MACOS_PACKAGES
+
+    elif system == "Linux":
+        if distro == "arch":
+            cmd = ["sudo", "pacman", "-S", "--noconfirm", "--needed"]
+            packages = ARCH_PACKAGES
+        elif distro == "ubuntu":
+            cmd = ["sudo", "apt-get", "install", "-y"]
+            packages = UBUNTU_PACKAGES
+        else:
+            typer.secho(f"Error: Unsupported operating system: {system} ({distro})", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+    else:
+        typer.secho(f"Error: Unsupported operating system: {system}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    msg = "This command will install the following system-wide packages:\n\n"
+    for package in packages:
+        msg += f"- {package}\n"
+    msg += "\nIt might ask for your sudo password."
+
+    confirm_step(
+        ctx,
+        msg,
+        "install-packages",
+    )
+
+    full_cmd = cmd + packages
+
+    try:
+        subprocess.run(  # noqa: S603
+            full_cmd,
+            check=True,
+            text=True,
+        )
+        typer.secho("✓ System packages installed successfully.", fg=typer.colors.GREEN)
+
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Error installing packages: {e}", fg=typer.colors.RED)
+        if e.stderr:
+            typer.echo(e.stderr)
