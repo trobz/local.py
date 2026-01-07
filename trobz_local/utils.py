@@ -67,6 +67,16 @@ class InvalidToolNameError(ValueError):
         super().__init__(f"Invalid tool name: {tool}")
 
 
+class InvalidScriptUrlError(ValueError):
+    def __init__(self, url: str):
+        super().__init__(f"Script URL must use HTTPS for security: {url}")
+
+
+class InvalidNpmPackageError(ValueError):
+    def __init__(self, pkg: str):
+        super().__init__(f"Invalid npm package name: {pkg}")
+
+
 class RepoConfig(BaseModel):
     odoo: list[str] = []
     oca: list[str] = []
@@ -80,9 +90,49 @@ class RepoConfig(BaseModel):
         return v
 
 
+class ScriptItem(BaseModel):
+    """Configuration for a script to download and execute."""
+
+    url: str
+    install_script: str = "install.sh"
+    name: str | None = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str):
+        if not v.startswith("https://"):
+            raise InvalidScriptUrlError(v)
+        return v
+
+
+class ToolsConfig(BaseModel):
+    """Configuration for tools to install."""
+
+    uv: list[str] = Field(default_factory=list)
+    npm: list[str] = Field(default_factory=list)
+    script: list[ScriptItem] = Field(default_factory=list)
+    system_packages: list[str] = Field(default_factory=list)
+
+    @field_validator("uv")
+    @classmethod
+    def validate_uv_tools(cls, v: list[str]):
+        for tool in v:
+            if not TOOL_NAME_REGEX.match(tool):
+                raise InvalidToolNameError(tool)
+        return v
+
+    @field_validator("npm")
+    @classmethod
+    def validate_npm_packages(cls, v: list[str]):
+        for pkg in v:
+            if not re.match(r"^(@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$", pkg):
+                raise InvalidNpmPackageError(pkg)
+        return v
+
+
 class ConfigModel(BaseModel):
     versions: list[str] = Field(default_factory=list)
-    tools: list[str] = Field(default_factory=list)
+    tools: ToolsConfig = Field(default_factory=ToolsConfig)
     repos: RepoConfig = Field(default_factory=RepoConfig)
 
     @field_validator("versions")
@@ -91,14 +141,6 @@ class ConfigModel(BaseModel):
         for version in v:
             if not VERSION_REGEX.match(version):
                 raise InvalidVersionError(version)
-        return v
-
-    @field_validator("tools")
-    @classmethod
-    def validate_tools(cls, v: list[str]):
-        for tool in v:
-            if not TOOL_NAME_REGEX.match(tool):
-                raise InvalidToolNameError(tool)
         return v
 
 
@@ -111,21 +153,40 @@ def get_uv_path():
 
 
 def show_config_instructions():
-    content = """
-versions = ["16.0", "17.0", "18.0"]
+    content = """versions = ["14.0", "15.0", "16.0", "17.0", "18.0"]
 
-tools = [
+[tools]
+uv = [
     "odoo-venv",
     "odoo-addons-path",
     "pre-commit",
 ]
 
+npm = [
+    "prettier",
+]
+
+[[tools.script]]
+name = "uv"
+url = "https://astral.sh/uv/install.sh"
+
+[[tools.script]]
+name = "nvm"
+url = "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh"
+
+system_packages = [
+    "pnpm",
+]
+
 [repos]
-odoo = ["odoo", "enterprise"]
+odoo = [
+    "odoo",
+    "enterprise",
+]
+
 oca = [
     "server-tools",
     "server-ux",
-    "web",
 ]
 """
     typer.secho("Config file not found.", fg=typer.colors.YELLOW)
