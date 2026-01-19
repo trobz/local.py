@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Annotated
@@ -10,15 +9,17 @@ from rich import print as rprint
 from rich.progress import Progress, TaskID
 from rich.tree import Tree
 
-from .concurrency import run_tasks
+from .concurrency import TaskResult, run_tasks
+from .installers import (
+    install_npm_packages,
+    install_scripts,
+    install_system_packages,
+    install_uv_tools,
+)
 from .utils import (
-    ARCH_PACKAGES,
-    MACOS_PACKAGES,
-    UBUNTU_PACKAGES,
     GitProgress,
     confirm_step,
     get_config,
-    get_os_info,
     get_uv_path,
 )
 
@@ -242,41 +243,115 @@ def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict):
         raise  # to be caught by run_tasks
 
 
+def _build_install_message(tools_config: dict) -> str:
+    msg = "This command will install tools in the following order:\n"
+
+    if tools_config.get("script"):
+        msg += "\n[1] Scripts (download & execute):\n"
+        for script in tools_config["script"]:
+            name = script.get("name") if isinstance(script, dict) else getattr(script, "name", None)
+            url = script["url"] if isinstance(script, dict) else script.url
+            sha256 = script.get("sha256") if isinstance(script, dict) else getattr(script, "sha256", None)
+            display_name = name or url
+            hash_status = "✓ verified" if sha256 else "⚠ no hash"
+            msg += f"  - {display_name} ({hash_status})\n"
+
+    if tools_config.get("system_packages"):
+        msg += "\n[2] System packages:\n"
+        for pkg in tools_config["system_packages"]:
+            msg += f"  - {pkg}\n"
+
+    if tools_config.get("npm"):
+        msg += "\n[3] NPM packages (via pnpm -g):\n"
+        for pkg in tools_config["npm"]:
+            msg += f"  - {pkg}\n"
+
+    if tools_config.get("uv"):
+        msg += "\n[4] UV tools:\n"
+        for tool in tools_config["uv"]:
+            msg += f"  - {tool}\n"
+
+    return msg
+
+
+def _run_installers(tools_config: dict, dry_run: bool) -> tuple[list, bool]:
+    all_results = []
+    any_failed = False
+
+    if tools_config.get("script"):
+        scripts = [
+            {
+                "url": s["url"] if isinstance(s, dict) else s.url,
+                "sha256": s.get("sha256") if isinstance(s, dict) else getattr(s, "sha256", None),
+                "name": s.get("name") if isinstance(s, dict) else getattr(s, "name", None),
+            }
+            for s in tools_config["script"]
+        ]
+        results = install_scripts(scripts, dry_run)
+        all_results.extend(results)
+        if any(not r.success for r in results):
+            any_failed = True
+
+    if tools_config.get("system_packages"):
+        success = install_system_packages(tools_config["system_packages"], dry_run)
+        if not success:
+            any_failed = True
+
+            all_results.append(
+                TaskResult(name="system-packages", success=False, message="System package installation failed")
+            )
+
+    if tools_config.get("npm"):
+        results = install_npm_packages(tools_config["npm"], dry_run)
+        all_results.extend(results)
+        if any(not r.success for r in results):
+            any_failed = True
+
+    if tools_config.get("uv"):
+        results = install_uv_tools(tools_config["uv"], dry_run)
+        all_results.extend(results)
+        if any(not r.success for r in results):
+            any_failed = True
+
+    return all_results, any_failed
+
+
 @app.command()
-def install_tools(ctx: typer.Context):
+def install_tools(
+    ctx: typer.Context,
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed without executing."),
+):
     """
     Install tools using uv tool based on config.
     """
     config = get_config()
-    tools = config.get("tools", [])
+    tools_config = config.get("tools", {})
 
-    if not tools:
-        typer.echo("No tools found in config.")
+    has_any = any([
+        tools_config.get("script"),
+        tools_config.get("system_packages"),
+        tools_config.get("npm"),
+        tools_config.get("uv"),
+    ])
+
+    if not has_any:
+        typer.echo("No tools found in config. Add tools to [tools] section in ~/code/config.toml")
         return
 
-    msg = "This command will install the following command-line tools using 'uv':\n\n"
-    for tool in tools:
-        msg += f"- {tool}\n"
+    msg = _build_install_message(tools_config)
+    confirm_step(ctx, msg, "install-tools")
 
-    confirm_step(
-        ctx,
-        msg,
-        "install-tools",
-    )
+    all_results, any_failed = _run_installers(tools_config, dry_run)
 
-    uv_path = get_uv_path()
-
-    for tool in tools:
-        try:
-            subprocess.run(  # noqa: S603 - tool input is safely checked above
-                [uv_path, "tool", "install", "--", tool],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            typer.secho(f"✓ {tool} installed successfully.", fg=typer.colors.GREEN)
-        except subprocess.CalledProcessError as e:
-            typer.secho(f"✗ Error installing {tool}: {e.stderr.strip()}", fg=typer.colors.RED)
+    if not dry_run:
+        if any_failed:
+            failed = [r for r in all_results if not r.success]
+            typer.secho("\n--- Some installations failed ---", fg=typer.colors.RED)
+            for r in failed:
+                typer.secho(f"✗ {r.name}: {r.message}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        else:
+            typer.secho("\n✓ All tools installed successfully.", fg=typer.colors.GREEN)
 
 
 @app.command()
@@ -375,63 +450,3 @@ def _create_venvs(
     except Exception as e:
         progress.update(task_id, description=f"[red]✗ Error venv {version}: {e}")
         raise
-
-
-@app.command()
-def install_packages(ctx: typer.Context):
-    """
-    Install system-wide packages required.
-    """
-    os_info = get_os_info()
-    system = os_info["system"]
-    distro = os_info["distro"]
-
-    cmd = []
-    packages = []
-
-    if system == "Darwin":
-        if not shutil.which("brew"):
-            typer.secho("Error: Homebrew is not installed. Please install it first.", fg=typer.colors.RED)
-            raise typer.Exit(code=1)
-        cmd = ["brew", "install"]
-        packages = MACOS_PACKAGES
-
-    elif system == "Linux":
-        if distro == "arch":
-            cmd = ["sudo", "pacman", "-S", "--noconfirm", "--needed"]
-            packages = ARCH_PACKAGES
-        elif distro == "ubuntu":
-            cmd = ["sudo", "apt-get", "install", "-y"]
-            packages = UBUNTU_PACKAGES
-        else:
-            typer.secho(f"Error: Unsupported operating system: {system} ({distro})", fg=typer.colors.RED)
-            raise typer.Exit(code=1)
-    else:
-        typer.secho(f"Error: Unsupported operating system: {system}", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
-
-    msg = "This command will install the following system-wide packages:\n\n"
-    for package in packages:
-        msg += f"- {package}\n"
-    msg += "\nIt might ask for your sudo password."
-
-    confirm_step(
-        ctx,
-        msg,
-        "install-packages",
-    )
-
-    full_cmd = cmd + packages
-
-    try:
-        subprocess.run(  # noqa: S603
-            full_cmd,
-            check=True,
-            text=True,
-        )
-        typer.secho("✓ System packages installed successfully.", fg=typer.colors.GREEN)
-
-    except subprocess.CalledProcessError as e:
-        typer.secho(f"Error installing packages: {e}", fg=typer.colors.RED)
-        if e.stderr:
-            typer.echo(e.stderr)
