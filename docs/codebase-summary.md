@@ -6,10 +6,10 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 | Metric | Value |
 |---|---|
-| **Language** | Python 3.10+ |
-| **Total LOC** | ~1,096 lines (core logic + tests) |
-| **Core Modules** | 6 files (main, installers, utils, concurrency, exceptions, \_\_init\_\_) |
-| **Test Coverage** | pytest with comprehensive unit tests |
+| **Language** | Python 3.12+ |
+| **Total LOC** | ~1,096 lines (core logic) + tests |
+| **Core Modules** | 6 files (main, installers, utils, concurrency, exceptions, \__init\_\_) |
+| **Test Modules** | tests/ directory with pytest unit tests |
 | **Primary Frameworks** | Typer (CLI), Pydantic (validation), Rich (UI), GitPython (git) |
 | **Concurrency Model** | ThreadPoolExecutor, max 4 workers, I/O-bound tasks |
 | **License** | AGPL-3.0 |
@@ -168,7 +168,8 @@ Summary Display - Success/failure reporting with exit code
 | `pydantic` | v2+ | Configuration validation with strict typing |
 | `rich` | Latest | Terminal UI (progress bars, colors, trees) |
 | `gitpython` | Latest | Programmatic git operations |
-| `tomli` | Latest | TOML parsing (Python <3.11) |
+| `tomllib` | Built-in (Python 3.11+) | TOML parsing for Python 3.11+ |
+| `tomli` | Latest (optional) | TOML parsing fallback for Python < 3.11 |
 
 ---
 
