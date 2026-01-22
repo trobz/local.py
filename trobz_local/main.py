@@ -1,4 +1,3 @@
-import os
 import subprocess
 from pathlib import Path
 from typing import Annotated
@@ -19,6 +18,7 @@ from .installers import (
 from .utils import (
     GitProgress,
     confirm_step,
+    get_code_root,
     get_config,
     get_uv_path,
 )
@@ -55,24 +55,25 @@ def init(ctx: typer.Context):
 
 
 def _run_init(ctx: typer.Context):
+    code_root = get_code_root()
     confirm_step(
         ctx,
-        "This command will create the basic directory structure for your local development environment inside '~/code'",
+        f"This command will create the basic directory structure for your local "
+        f"development environment inside '{code_root}'",
         "init",
     )
     config = get_config()
     dirs = [
-        "~/code/venvs",
-        "~/code/oca",
-        "~/code/odoo",
-        "~/code/odoo/odoo",
-        "~/code/odoo/enterprise",
-        "~/code/trobz/projects",
-        "~/code/trobz/packages",
+        "venvs",
+        "oca",
+        "odoo",
+        "odoo/odoo",
+        "odoo/enterprise",
+        "trobz/projects",
+        "trobz/packages",
     ]
     for d in dirs:
-        d = os.path.expanduser(d)
-        os.makedirs(d, exist_ok=True)
+        (code_root / d).mkdir(parents=True, exist_ok=True)
 
     odoo_versions = config.get("versions")
     if not odoo_versions:
@@ -80,9 +81,9 @@ def _run_init(ctx: typer.Context):
         raise typer.Exit(code=1)
 
     for version in odoo_versions:
-        os.makedirs(os.path.expanduser(f"~/code/oca/{version}"), exist_ok=True)
+        (code_root / "oca" / version).mkdir(parents=True, exist_ok=True)
 
-    root_path = Path(os.path.expanduser("~/code"))
+    root_path = code_root
     typer.secho("Required directories are created successfully.", fg=typer.colors.GREEN)
     tree = Tree(f"[bold yellow]{root_path}[/bold yellow]")
 
@@ -125,7 +126,7 @@ def pull_repos(  # noqa: C901
     config = get_config()
     odoo_versions = config.get("versions", [])
     repos_config = config.get("repos", {})
-    code_root = Path.home() / "code"
+    code_root = get_code_root()
 
     repo_infos_for_tasks = _get_tasks(odoo_versions, repos_config, code_root, repo_filter)
 
@@ -335,7 +336,8 @@ def install_tools(
     ])
 
     if not has_any:
-        typer.echo("No tools found in config. Add tools to [tools] section in ~/code/config.toml")
+        code_root = get_code_root()
+        typer.echo(f"No tools found in config. Add tools to [tools] section in {code_root}/config.toml")
         return
 
     msg = _build_install_message(tools_config)
@@ -366,15 +368,18 @@ def create_venvs(ctx: typer.Context):
         typer.echo("No versions found in config.")
         return
 
+    code_root = get_code_root()
+    venv_dir_base = code_root / "venvs"
+
     msg = (
         "This command will create Python virtual environments for the following Odoo versions "
         "using 'odoo-venv' with the 'demo' preset, using Python '3.12':\n\n"
     )
     for version in versions:
-        msg += f"- {version} -> ~/code/venvs/{version}\n"
+        msg += f"- {version} -> {venv_dir_base / version}\n"
 
     msg += "\nTo activate a virtual environment manually, run:\n"
-    msg += "[bold cyan]source ~/code/venvs/<version>/bin/activate[/bold cyan]\n"
+    msg += f"[bold cyan]source {venv_dir_base / '<version>'}/bin/activate[/bold cyan]\n"
 
     msg += "\nFor more information, read at https://github.com/trobz/odoo-venv."
 
@@ -385,9 +390,7 @@ def create_venvs(ctx: typer.Context):
     )
 
     uv_path = get_uv_path()
-    code_root = Path.home() / "code"
     odoo_dir_base = code_root / "odoo" / "odoo"
-    venv_dir_base = code_root / "venvs"
 
     concurrency_tasks = []
     for version in versions:

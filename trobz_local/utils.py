@@ -205,7 +205,7 @@ oca = [
 
 
 def get_config():
-    """Loads and validates configuration from ~/code/config.toml."""
+    """Loads and validates configuration from code_dir/config.toml."""
     config_path = get_code_root() / "config.toml"
     if not config_path.exists():
         show_config_instructions()
