@@ -477,19 +477,25 @@ Script Execution
 
 ### Adding New Commands
 1. Define function in `main.py` with `@app.command()` decorator
-2. Follow signature: `async func(ctx: typer.Context, args: Type)`
+2. Follow signature: `func(ctx: typer.Context, ...)` with typer.Option() for additional parameters
 3. Use `confirm_step()` for newcomer mode
 4. Call installers or utilities as needed
+5. Return `typer.Exit(code=0)` on success or `typer.Exit(code=1)` on failure
 
 ### Adding New Installers
 1. Create function: `install_xxx(items: list[str], dry_run: bool) -> list[TaskResult]`
-2. Use `run_tasks()` for parallelization
+2. Use `run_tasks()` for parallelization with `max_workers` parameter
 3. Add to `_run_installers()` in main.py
 
 ### Adding Configuration Fields
 1. Update Pydantic models in `utils.py`
 2. Add validators if needed (regex patterns, custom logic)
 3. Document in `docs/project-overview-pdr.md`
+
+### Concurrency Configuration
+- `run_tasks()` accepts `max_workers` parameter (default: 4)
+- Can be customized per operation type if needed
+- Example: `run_tasks(tasks, max_workers=8)` for more parallelization
 
 ---
 
