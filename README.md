@@ -11,12 +11,13 @@ A developer tool for automating setup and management of local Odoo development e
 
 ## Key Features
 
-- **Environment Initialization** (`init`): Creates standardized directory structure at `~/code/`
+- **Environment Initialization** (`init`): Creates standardized directory structure (default: `~/code/`)
 - **Repository Management** (`pull-repos`): Clones/updates Odoo and OCA repos in parallel
 - **Tool Installation** (`install-tools`): Installs from four sources: scripts, system packages, NPM, and UV tools
 - **Virtual Environments** (`create-venvs`): Creates Odoo venvs for each configured version
 - **Interactive Mode**: Newcomer mode with confirmations and guidance
 - **Security**: HTTPS enforcement for all downloads
+- **Custom Directory**: Use `TLC_CODE_DIR` env var to override default `~/code` location
 
 ## Installation
 
@@ -29,11 +30,12 @@ uv tool install git+ssh://git@github.com:trobz/local.py.git
 ## Quick Start
 
 ```bash
-# 1. Initialize directory structure
+# 1. Initialize directory structure (uses ~/code by default, or set TLC_CODE_DIR)
+export TLC_CODE_DIR=~/Development  # Optional: customize location
 tlc init
 
 # 2. Create config file
-cat > ~/code/config.toml << 'EOF'
+cat > ~/Development/config.toml << 'EOF'
 versions = ["16.0", "17.0"]
 
 [tools]
@@ -56,7 +58,7 @@ tlc install-tools    # Install tools
 
 | Command | Purpose |
 |---------|---------|
-| `tlc init` | Create directory structure in `~/code/` |
+| `tlc init` | Create directory structure (default: `~/code/`) |
 | `tlc pull-repos` | Clone or update Odoo/OCA repositories |
 | `tlc create-venvs` | Create Python virtual environments |
 | `tlc install-tools` | Install scripts, packages, and tools |
@@ -65,7 +67,7 @@ Use `--newcomer=false` to skip confirmation prompts. Use `--help` on any command
 
 ## Configuration
 
-Place `~/code/config.toml` with your environment definition:
+Place `config.toml` in your code directory (default: `~/code/config.toml`):
 
 ```toml
 versions = ["16.0", "17.0", "18.0"]
@@ -83,6 +85,21 @@ name = "uv installer"
 odoo = ["odoo", "enterprise"]
 oca = ["server-tools", "server-ux", "web"]
 ```
+
+### Custom Code Directory
+
+By default, `tlc` uses `~/code` as the base directory. You can customize this by setting the `TLC_CODE_DIR` environment variable:
+
+```bash
+# Use a custom directory
+export TLC_CODE_DIR=/data/dev
+tlc init  # Creates directory structure at /data/dev
+
+# One-liner
+TLC_CODE_DIR=/custom/path tlc init
+```
+
+The config file will be created at `{TLC_CODE_DIR}/config.toml`.
 
 See [Configuration Schema](./docs/project-overview-pdr.md#configuration-schema) for all options and validation rules.
 

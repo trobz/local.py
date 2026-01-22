@@ -145,7 +145,7 @@ User Command
     ↓
 CLI (main.py) - Parse and route
     ↓
-Config Loading (utils.py) - Validate ~/code/config.toml
+Config Loading (utils.py) - Validate {CODE_ROOT}/config.toml (uses get_code_root())
     ↓
 Task Generation - Build list of operations
     ↓
@@ -157,6 +157,10 @@ Results Aggregation - TaskResult collection
     ↓
 Summary Display - Success/failure reporting with exit code
 ```
+
+The `get_code_root()` function (utils.py) resolves the code root directory by:
+1. First checking for `TLC_CODE_DIR` environment variable
+2. Falling back to `~/code` if not set
 
 ---
 

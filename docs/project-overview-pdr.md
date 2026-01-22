@@ -4,7 +4,7 @@
 
 `trobz_local` (CLI: `tlc`) is a developer automation tool for setting up and managing local Odoo development environments. It reduces setup time from hours to minutes by automating directory creation, repository management, and tool installation.
 
-The tool uses declarative configuration: developers specify desired environment state in `~/code/config.toml`, and `tlc` performs necessary operations to reach that state.
+The tool uses declarative configuration: developers specify desired environment state in `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`), and `tlc` performs necessary operations to reach that state. The code root can be customized via the `TLC_CODE_DIR` environment variable.
 
 ## Vision & Purpose
 
@@ -23,9 +23,9 @@ The tool uses declarative configuration: developers specify desired environment 
 ## Core Features
 
 ### 1. Environment Initialization (`init`)
-Creates standardized directory structure at `~/code/`:
+Creates standardized directory structure (default: `~/code/`):
 ```
-~/code/
+{CODE_ROOT}/
 ├── venvs/           # Python virtual environments
 ├── oca/             # OCA repositories (Odoo Community Association)
 ├── odoo/            # Odoo repositories
@@ -35,6 +35,8 @@ Creates standardized directory structure at `~/code/`:
     ├── projects/
     └── packages/
 ```
+
+Use `TLC_CODE_DIR` environment variable to customize the base directory.
 
 ### 2. Repository Management (`pull-repos`)
 Clones or updates Odoo and OCA repositories:
@@ -73,11 +75,11 @@ Creates Odoo-specific environments:
 
 | Requirement | Description |
 |---|---|
-| **FR-1: Directory Structure** | Create `~/code/` with `venvs/`, `oca/`, `odoo/`, `trobz/` subdirectories and version-specific folders |
+| **FR-1: Directory Structure** | Create `{CODE_ROOT}/` (default: `~/code/`) with `venvs/`, `oca/`, `odoo/`, `trobz/` subdirectories and version-specific folders |
 | **FR-2: Repository Operations** | Clone repos with `depth=1`, update via fetch+reset, support parallelization, allow name filtering |
 | **FR-3: Virtual Environments** | Create venvs for each Odoo version using `odoo-venv`, support parallel creation |
 | **FR-4: Tool Installation** | Four-stage pipeline: scripts → system packages → npm → uv tools; OS-aware package managers |
-| **FR-5: Configuration** | TOML config at `~/code/config.toml`, strict Pydantic validation, clear error messages with examples |
+| **FR-5: Configuration** | TOML config at `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`), strict Pydantic validation, clear error messages with examples |
 | **FR-6: User Interaction** | Interactive "newcomer mode", dry-run preview, rich console UI (progress bars, trees, colors) |
 
 ## Non-Functional Requirements
@@ -205,12 +207,15 @@ repos.odoo = ["invalid/name"]                  # ✗ Slash not allowed
 ## CLI Command Reference
 
 ### `tlc init`
-Initialize the directory structure at `~/code/`.
+Initialize the directory structure (default: `~/code/`, customize with `TLC_CODE_DIR`).
 
 **Usage**: `tlc init`
 
 **Options**:
 - `--newcomer / --no-newcomer`: Enable interactive mode (default: True)
+
+**Environment Variables**:
+- `TLC_CODE_DIR`: Override default `~/code` base directory
 
 **Output**: Rich tree showing created directory structure
 
@@ -229,7 +234,7 @@ Clone missing repositories and update existing ones.
 - `--newcomer / --no-newcomer`: Enable interactive mode (default: True)
 
 **Behavior**:
-- Reads `~/code/config.toml` and loads repo definitions
+- Reads `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`) and loads repo definitions
 - For each version, clones missing repos (shallow, depth=1) or updates existing ones
 - Updates via: git fetch, checkout branch, hard reset to origin/branch
 - Executes up to 4 repos in parallel
@@ -248,9 +253,9 @@ Create Python virtual environments for each Odoo version.
 - `--newcomer / --no-newcomer`: Enable interactive mode (default: True)
 
 **Behavior**:
-- Reads versions from `~/code/config.toml`
+- Reads versions from `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`)
 - Invokes `uv tool run odoo-venv --preset demo --python 3.12` for each version
-- Creates venvs at `~/code/venvs/{version}/`
+- Creates venvs at `{CODE_ROOT}/venvs/{version}/` (default: `~/code/venvs/{version}/`)
 - Executes up to 4 venvs in parallel
 - Shows progress bar during creation
 
@@ -276,7 +281,7 @@ Install tools from four sources in order: scripts, system packages, npm, uv.
 4. **UV Tools**: Global installation via `uv tool install`
 
 **Behavior**:
-- Reads `[tools]` section from `~/code/config.toml`
+- Reads `[tools]` section from `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`)
 - Shows descriptive message of all tools to be installed
 - Confirms in newcomer mode
 - Scripts and NPM/UV tools run in parallel (max 4 workers)
@@ -311,7 +316,8 @@ tlc install-tools --dry-run       # Preview operations
 | Variable | Default | Affects |
 |---|---|---|
 | `NEWCOMER_MODE` | true | Interactive mode for all commands |
-| `HOME` | (user home) | Location of `~/code/config.toml` |
+| `HOME` | (user home) | Used to resolve `~/code` default path |
+| `TLC_CODE_DIR` | `~/code` | Override the default code root directory |
 
 ---
 

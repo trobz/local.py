@@ -66,15 +66,15 @@ High-level design and component interactions in `trobz_local`.
 ```
 init command
     │
-    └─ Create directory tree at ~/code/
+    └─ Create directory tree at {CODE_ROOT}/ (default: ~/code/, customize with TLC_CODE_DIR)
        ├─ venvs/
        ├─ oca/{version}/
        ├─ odoo/odoo/{version}/
        ├─ odoo/enterprise/{version}/
        └─ trobz/{projects, packages}/
-       │
-       └─ Display Rich tree
-           └─ Exit 0
+        │
+        └─ Display Rich tree
+            └─ Exit 0
 ```
 
 ---
@@ -183,7 +183,7 @@ create-venvs command
 ### Configuration Pipeline
 
 ```
-~/code/config.toml
+{CODE_ROOT}/config.toml (default: ~/code/config.toml)
         │
         ▼
     [Read TOML]
@@ -446,7 +446,7 @@ RepoConfig(
 User (trusted)
     │
     ▼
-~/code/config.toml (semi-trusted, validated)
+{CODE_ROOT}/config.toml (default: ~/code/config.toml, semi-trusted, validated)
     │
     ├─ Pydantic validation
     ├─ Regex pattern validation
@@ -528,16 +528,18 @@ uv tool install git+ssh://git@github.com:trobz/local.py.git
 ### Configuration
 ```bash
 # User creates once:
-~/code/config.toml
+~/code/config.toml  # or {TLC_CODE_DIR}/config.toml
 ```
 - Personal environment definition
 - Not committed to any repository
 - Can vary per developer
+- Config location follows the code root directory
 
 ### Execution
 ```bash
 tlc <command>  # Works from anywhere
 ```
-- Uses `$HOME/code/` as root
+- Uses `TLC_CODE_DIR` env var if set, otherwise `$HOME/code/` as root
 - No elevated privileges needed except for package installation (sudo)
 - All changes isolated to user's home directory
+- Customize with: `export TLC_CODE_DIR=/custom/path`
