@@ -169,11 +169,12 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ## File Structure
 
 **Max file size**: 500 LOC (split if larger)
-- `main.py`: CLI commands and orchestration
-- `installers.py`: Installation strategies
-- `utils.py`: Config, platform detection, helpers
-- `concurrency.py`: Task runner with progress
-- `exceptions.py`: Custom exception classes
+- `main.py`: CLI commands and orchestration (452 LOC)
+- `installers.py`: Installation strategies (282 LOC)
+- `utils.py`: Config, platform detection, helpers (264 LOC)
+- `concurrency.py`: Task runner with progress (60 LOC)
+- `exceptions.py`: Custom exception classes (38 LOC)
+- `tests/`: pytest unit tests for all modules
 
 **Imports in each module**:
 - No circular imports
