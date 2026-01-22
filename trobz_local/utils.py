@@ -1,3 +1,4 @@
+import os
 import platform
 import re
 import shutil
@@ -144,6 +145,14 @@ class ConfigModel(BaseModel):
         return v
 
 
+def get_code_root() -> Path:
+    """Get the code root directory from TLC_CODE_DIR env var or default to ~/code."""
+    env_code_dir = os.environ.get("TLC_CODE_DIR")
+    if env_code_dir:
+        return Path(os.path.expanduser(env_code_dir))
+    return Path.home() / "code"
+
+
 def get_uv_path():
     uv_path = shutil.which("uv")
     if not uv_path:
@@ -190,13 +199,14 @@ oca = [
 ]
 """
     typer.secho("Config file not found.", fg=typer.colors.YELLOW)
-    typer.echo("Please create ~/code/config.toml with content like this:")
+    code_root = get_code_root()
+    typer.echo(f"Please create {code_root}/config.toml with content like this:")
     typer.echo(content)
 
 
 def get_config():
     """Loads and validates configuration from ~/code/config.toml."""
-    config_path = Path.home() / "code" / "config.toml"
+    config_path = get_code_root() / "config.toml"
     if not config_path.exists():
         show_config_instructions()
         raise typer.Exit(code=1)
