@@ -15,7 +15,7 @@ from rich.progress import (
 )
 
 TOOL_NAME_REGEX = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$")
-VERSION_REGEX = re.compile(r"^\d+\.\d+$")
+VERSION_REGEX = re.compile(r"^(?:\d+\.\d+|master)$")
 
 ARCH_PACKAGES = [
     "gcc",
