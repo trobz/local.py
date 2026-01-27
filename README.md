@@ -21,10 +21,22 @@ A developer tool for automating setup and management of local Odoo development e
 
 ## Installation
 
-Install globally using [uv](https://docs.astral.sh/uv/):
+### Quick Install (Recommended)
+
+Run the bootstrap script to install all dependencies and `tlc` in one command:
 
 ```bash
-uv tool install git+ssh://git@github.com:trobz/local.py.git
+curl -fsSL https://raw.githubusercontent.com/trobz/local.py/main/bootstrap.sh | bash
+```
+
+This installs: `git`, `gh`, `uv`, configures PostgreSQL APT repository, and sets up SSH for GitHub.
+
+### Manual Install
+
+If you already have `uv` installed:
+
+```bash
+uv tool install git+https://github.com/trobz/local.py.git
 ```
 
 ## Quick Start
@@ -106,9 +118,9 @@ See [Configuration Schema](./docs/project-overview-pdr.md#configuration-schema) 
 ## System Requirements
 
 - Python 3.10+
-- `uv` package manager
 - Linux (Arch, Ubuntu) or macOS
-- System tools: `git`, `wget` or `curl`, `sh`
+- `curl`
+- Sudo privileges (for bootstrap script)
 
 ## Documentation
 
