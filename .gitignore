@@ -219,3 +219,7 @@ __marimo__/
 plans/**/*
 !plans/templates/*
 repomix-output.xml
+AGENTS.md
+.claude/
+.opencode/
+release-manifest.json

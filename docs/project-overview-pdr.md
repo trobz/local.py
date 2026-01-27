@@ -122,10 +122,11 @@ oca = ["server-tools", "server-ux", "web"]
 ### Field Reference & Validation
 
 #### `versions` (Required)
-Odoo versions to set up. Format: Major.Minor (e.g., "16.0", "17.0")
+Odoo versions to set up. Supports semantic versioning (Major.Minor) or "master" branch.
 - **Type**: List of strings
-- **Pattern**: `^\d+\.\d+$`
-- **Example**: `["16.0", "17.0", "18.0"]`
+- **Pattern**: `^(?:\d+\.\d+|master)$`
+- **Examples**: `["16.0", "17.0", "18.0"]` or `["master", "17.0"]`
+- **Note**: "master" branch for development, semver (16.0, 17.0) for stable releases
 
 #### `tools.uv` (Optional)
 UV tools to install globally via `uv tool install`
@@ -188,7 +189,7 @@ System packages are automatically merged with defaults for your OS:
 
 **Valid configurations:**
 ```toml
-versions = ["16.0", "17.0"]                    # ✓ Correct format
+versions = ["16.0", "17.0", "master"]         # ✓ Correct format with master branch
 tools.uv = ["package[extra]@1.0", "tool"]     # ✓ Supports extras syntax
 tools.npm = ["@babel/core", "prettier"]       # ✓ Scoped and unscoped
 repos.odoo = ["odoo", "enterprise"]           # ✓ Both sources
@@ -197,7 +198,8 @@ repos.oca = ["server-tools", "web"]           # ✓ Valid names
 
 **Invalid configurations:**
 ```toml
-versions = ["16", "17.0"]                      # ✗ First version invalid format
+versions = ["16", "17.0"]                      # ✗ First version invalid (missing minor)
+versions = ["main", "17.0"]                    # ✗ "main" not supported (use "master")
 tools.uv = [" invalid"]                        # ✗ Leading space
 tools.npm = ["__invalid"]                      # ✗ Double underscore
 tools.script = [{url = "http://..."}]          # ✗ HTTP not allowed (HTTPS only)
