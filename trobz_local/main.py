@@ -63,15 +63,15 @@ def _run_init(ctx: typer.Context):
         "init",
     )
     config = get_config()
+    # Hardcoded defaults
     dirs = [
         "venvs",
         "oca",
         "odoo",
         "odoo/odoo",
-        "odoo/enterprise",
-        "trobz/projects",
-        "trobz/packages",
     ]
+    # Additional directories from config
+    dirs.extend(config.get("init_dirs", []))
     for d in dirs:
         (code_root / d).mkdir(parents=True, exist_ok=True)
 
@@ -97,13 +97,11 @@ def _run_init(ctx: typer.Context):
     community = odoo_tree.add("odoo [dim]# Odoo Community[/dim]")
     for version in odoo_versions:
         community.add(f"{version}")
-    ent = odoo_tree.add("enterprise [dim]# Odoo Enterprise[/dim]")
-    for version in odoo_versions:
-        ent.add(f"{version}")
 
-    trobz_tree = tree.add("trobz [dim]# Trobz repositories[/dim]")
-    trobz_tree.add("projects")
-    trobz_tree.add("packages [dim]# Internal packages[/dim]")
+    # Show additional directories from config
+    extra_dirs = config.get("init_dirs", [])
+    for d in extra_dirs:
+        tree.add(f"{d}")
     rprint(tree)
 
 
