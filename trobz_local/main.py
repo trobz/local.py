@@ -373,7 +373,7 @@ def create_venvs(ctx: typer.Context):
 
     msg = (
         "This command will create Python virtual environments for the following Odoo versions "
-        "using 'odoo-venv' with the 'demo' preset, using Python '3.12':\n\n"
+        "using 'odoo-venv' with the 'local' preset:\n\n"
     )
     for version in versions:
         msg += f"- {version} -> {venv_dir_base / version}\n"
@@ -435,9 +435,8 @@ def _create_venvs(
             "--venv-dir",
             str(venv_dir),
             "--preset",
-            "demo",
-            "-p",
-            "3.12",
+            "local",
+            "--verbose",
         ]
 
         subprocess.run(  # noqa: S603
