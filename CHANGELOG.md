@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-01-28)
+
+### Documentation
+
+- Update codebase metrics and version validation regex
+  ([`d333d03`](https://github.com/trobz/local.py/commit/d333d0300efc7569eebebc1daf0f9f1efb8c638f))
+
+### Features
+
+- Add master as valid branch to pull
+  ([`b1d69ac`](https://github.com/trobz/local.py/commit/b1d69acdc98df7c69aa6e73c72bca29336002b59))
+
+
 ## v0.2.0 (2026-01-22)
 
 ### Documentation
