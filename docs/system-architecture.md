@@ -497,6 +497,12 @@ Script Execution
 - Can be customized per operation type if needed
 - Example: `run_tasks(tasks, max_workers=8)` for more parallelization
 
+### Version Support
+- **Semantic Versioning**: "16.0", "17.0", "18.0" (standard Odoo releases)
+- **Master Branch**: "master" for development/cutting-edge versions
+- **Pattern**: `^(?:\d+\.\d+|master)$` enforced via Pydantic validation
+- **Branch Mapping**: Version strings map to git branch names during pull-repos
+
 ---
 
 ## Performance Characteristics

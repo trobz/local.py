@@ -74,7 +74,7 @@ Config validated at startup. Early detection prevents side effects on invalid in
 
 ### Input Validation
 - **Regex patterns** - All config fields validated with specific patterns:
-  - Versions: `^\d+\.\d+$`
+  - Versions: `^(?:\d+\.\d+|master)$` (supports semver and "master" branch)
   - UV tools: `^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$`
   - Repo names: `^[a-zA-Z0-9._-]+$`
 - **Pydantic models** - No ad-hoc parsing of config
@@ -169,12 +169,12 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ## File Structure
 
 **Max file size**: 500 LOC (split if larger)
-- `main.py`: CLI commands and orchestration (452 LOC)
-- `installers.py`: Installation strategies (282 LOC)
-- `utils.py`: Config, platform detection, helpers (264 LOC)
-- `concurrency.py`: Task runner with progress (60 LOC)
-- `exceptions.py`: Custom exception classes (38 LOC)
-- `tests/`: pytest unit tests for all modules
+- `main.py`: CLI commands and orchestration (455 LOC)
+- `installers.py`: Installation strategies (283 LOC)
+- `utils.py`: Config, platform detection, helpers (275 LOC)
+- `concurrency.py`: Task runner with progress (61 LOC)
+- `exceptions.py`: Custom exception classes (39 LOC)
+- `tests/`: pytest unit tests (613 LOC total, 69% coverage)
 
 **Imports in each module**:
 - No circular imports

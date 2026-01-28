@@ -6,17 +6,18 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 | Metric | Value |
 |---|---|
-| **Language** | Python 3.12+ |
-| **Total LOC** | ~1,096 lines (core logic) + tests |
-| **Core Modules** | 6 files (main, installers, utils, concurrency, exceptions, \__init\_\_) |
-| **Test Modules** | tests/ directory with pytest unit tests |
+| **Language** | Python 3.10+ |
+| **Core LOC** | 1,109 lines (production code across 6 files) |
+| **Test LOC** | 613 lines (4 test files, 69% coverage, 20 passing tests) |
+| **Core Modules** | 6 files: main (455), installers (282), utils (274), concurrency (60), exceptions (38), __init__ (0) |
+| **Test Modules** | test_pull_repos (211), test_install_tools (253), test_create_venvs (123), test_utils (26) |
 | **Primary Frameworks** | Typer (CLI), Pydantic (validation), Rich (UI), GitPython (git) |
 | **Concurrency Model** | ThreadPoolExecutor, max 4 workers, I/O-bound tasks |
 | **License** | AGPL-3.0 |
 
 ## Module Breakdown
 
-### `main.py` (452 LOC)
+### `main.py` (455 LOC)
 **Purpose**: CLI entry point and command orchestration
 
 **Responsibilities**:
@@ -41,7 +42,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `installers.py` (282 LOC)
+### `installers.py` (283 LOC)
 **Purpose**: Multi-source tool installation strategies
 
 **Strategies**:
@@ -64,7 +65,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `utils.py` (264 LOC)
+### `utils.py` (275 LOC)
 **Purpose**: Configuration validation, platform detection, utilities
 
 **Pydantic Models**:
@@ -74,13 +75,14 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 - `RepoConfig` - Repository definitions (odoo, oca)
 
 **Validation**:
-- Versions: Pattern `^\d+\.\d+$`
+- Versions: Pattern `^(?:\d+\.\d+|master)$` (supports semver and "master" branch)
 - UV tools: Pattern `^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$`
 - NPM packages: Scoped and unscoped validation
 - Scripts: HTTPS-only enforcement
 - Repo names: Pattern `^[a-zA-Z0-9._-]+$`
 
 **Key Functions**:
+- `get_code_root()` - Resolve code root directory from TLC_CODE_DIR env var or default to ~/code
 - `get_config()` - Load and validate config.toml with error handling
 - `get_uv_path()` - Locate uv executable
 - `get_os_info()` - Return {system, distro} for platform detection
@@ -91,7 +93,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `concurrency.py` (60 LOC)
+### `concurrency.py` (61 LOC)
 **Purpose**: Generic parallel task execution with progress tracking
 
 **TaskResult Dataclass**:
@@ -113,7 +115,7 @@ class TaskResult:
 
 ---
 
-### `exceptions.py` (38 LOC)
+### `exceptions.py` (39 LOC)
 **Purpose**: Custom exception hierarchy for granular error handling
 
 **Exception Classes**:
@@ -161,6 +163,8 @@ Summary Display - Success/failure reporting with exit code
 The `get_code_root()` function (utils.py) resolves the code root directory by:
 1. First checking for `TLC_CODE_DIR` environment variable
 2. Falling back to `~/code` if not set
+
+This enables flexible deployment: developers can customize the base directory via environment variable while maintaining consistent configuration file location at `{CODE_ROOT}/config.toml`.
 
 ---
 
