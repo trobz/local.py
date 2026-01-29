@@ -14,6 +14,7 @@ from .installers import (
     install_scripts,
     install_system_packages,
     install_uv_tools,
+    setup_postgresql_repo,
 )
 from .postgres import (
     check_postgres_running,
@@ -297,6 +298,10 @@ def _run_installers(tools_config: dict, dry_run: bool) -> tuple[list, bool]:
         all_results.extend(results)
         if any(not r.success for r in results):
             any_failed = True
+
+    # Setup PostgreSQL repository before system package installation
+    if not dry_run:
+        setup_postgresql_repo()
 
     if tools_config.get("system_packages"):
         success = install_system_packages(tools_config["system_packages"], dry_run)

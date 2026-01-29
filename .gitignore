@@ -219,3 +219,5 @@ __marimo__/
 plans/**/*
 !plans/templates/*
 repomix-output.xml
+.claude/
+.opencode/

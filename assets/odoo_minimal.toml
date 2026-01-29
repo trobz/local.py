@@ -1,0 +1,10 @@
+# Minimal config to set up latest Odoo for development
+# Place this file at ~/code/config.toml (or set TLC_CODE_DIR)
+
+versions = ["18.0"]
+
+[tools]
+uv = ["odoo-venv"]
+
+[repos]
+odoo = ["odoo"]

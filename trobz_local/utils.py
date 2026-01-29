@@ -183,9 +183,7 @@ url = "https://astral.sh/uv/install.sh"
 name = "nvm"
 url = "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh"
 
-system_packages = [
-    "pnpm",
-]
+system_packages = []
 
 [repos]
 odoo = [
@@ -205,8 +203,13 @@ oca = [
 
 
 def get_config():
-    """Loads and validates configuration from code_dir/config.toml."""
+    """Loads and validates configuration from default location.
+
+    Returns:
+        Validated config dict
+    """
     config_path = get_code_root() / "config.toml"
+
     if not config_path.exists():
         show_config_instructions()
         raise typer.Exit(code=1)
