@@ -22,6 +22,23 @@ The tool uses declarative configuration: developers specify desired environment 
 
 ## Core Features
 
+### 0. Bootstrap Script (`bootstrap.sh`)
+Automated installation of prerequisites before using `tlc`:
+- **Dependencies**: Installs git, gh (GitHub CLI), and uv
+- **SSH Setup**: Configures GitHub SSH keys in known_hosts
+- **Installation**: Installs `trobz_local` CLI (tlc) via uv
+- **Idempotent**: Skips already-installed tools
+- **OS-aware**: Supports macOS (brew), Debian/Ubuntu (apt), Fedora (dnf), Arch (pacman)
+
+**Usage**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/trobz/local.py/main/bootstrap.sh | sh
+```
+
+After bootstrap, use `tlc` commands to complete environment setup.
+
+---
+
 ### 1. Environment Initialization (`init`)
 Creates standardized directory structure (default: `~/code/`):
 ```
@@ -46,11 +63,12 @@ Clones or updates Odoo and OCA repositories:
 - **Operations**: Clone new repos, fetch and hard-reset existing ones
 
 ### 3. Tool Installation (`install-tools`)
-Four-stage installation pipeline:
-1. **Shell Scripts**: Download and execute scripts (e.g., uv installer)
-2. **System Packages**: OS-aware installation via apt/pacman/brew
-3. **NPM Packages**: Global packages via pnpm
-4. **UV Tools**: Python tools via uv tool install
+Five-stage installation pipeline:
+1. **PostgreSQL Repository** (Debian/Ubuntu only): Setup PGDG APT repository with GPG verification (idempotent)
+2. **Shell Scripts**: Download and execute scripts (e.g., uv installer)
+3. **System Packages**: OS-aware installation via apt/pacman/brew (runs after PostgreSQL repo setup on Debian/Ubuntu)
+4. **NPM Packages**: Global packages via pnpm
+5. **UV Tools**: Python tools via uv tool install
 
 ### 4. Virtual Environment Management (`create-venvs`)
 Creates Odoo-specific environments:
@@ -280,7 +298,7 @@ Create Python virtual environments for each Odoo version.
 ---
 
 ### `tlc install-tools`
-Install tools from four sources in order: scripts, system packages, npm, uv.
+Install tools from five sources in order: PostgreSQL repo, scripts, system packages, npm, uv.
 
 **Usage**: `tlc install-tools [OPTIONS]`
 
@@ -289,10 +307,11 @@ Install tools from four sources in order: scripts, system packages, npm, uv.
 - `--newcomer / --no-newcomer`: Enable interactive mode (default: True)
 
 **Execution Order**:
-1. **Scripts**: Download and execute via `wget` or `curl`, then `sh`
-2. **System Packages**: OS-aware installation (apt/pacman/brew)
-3. **NPM Packages**: Global installation via `pnpm install -g`
-4. **UV Tools**: Global installation via `uv tool install`
+1. **PostgreSQL Repository** (Debian/Ubuntu): Setup PGDG APT repository with GPG verification
+2. **Scripts**: Download and execute via `wget` or `curl`, then `sh`
+3. **System Packages**: OS-aware installation (apt/pacman/brew) - runs after PostgreSQL repo on Debian/Ubuntu
+4. **NPM Packages**: Global installation via `pnpm install -g`
+5. **UV Tools**: Global installation via `uv tool install`
 
 **Behavior**:
 - Reads `[tools]` section from `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`)

@@ -6,8 +6,9 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 | Metric | Value |
 |---|---|
-| **Language** | Python 3.12+ |
-| **Total LOC** | ~1,287 lines (core logic) + tests |
+| **Version** | 0.2.0 |
+| **Language** | Python 3.10+ |
+| **Total LOC** | ~1,460 lines (core logic) + tests |
 | **Core Modules** | 7 files (main, installers, utils, postgres, concurrency, exceptions, \__init\_\_) |
 | **Test Modules** | tests/ directory with pytest unit tests |
 | **Primary Frameworks** | Typer (CLI), Pydantic (validation), Rich (UI), GitPython (git) |
@@ -16,7 +17,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ## Module Breakdown
 
-### `main.py` (473+ LOC)
+### `main.py` (523 LOC)
 **Purpose**: CLI entry point and command orchestration
 
 **Responsibilities**:
@@ -24,6 +25,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 - Manage "newcomer mode" state (interactive confirmations)
 - Orchestrate calls to installers, git operations, venv creation, and PostgreSQL user management
 - Handle user interaction and progress reporting
+- Coordinate PostgreSQL repo setup before system package installation
 
 **Key Commands**:
 - `init`: Create directory structure
@@ -43,18 +45,20 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `installers.py` (283 LOC)
+### `installers.py` (389 LOC)
 **Purpose**: Multi-source tool installation strategies
 
 **Strategies**:
-1. **Scripts**: Download via wget/curl, execute with /bin/sh
-2. **System Packages**: OS-aware (apt-get, pacman, brew) with platform defaults
-3. **NPM Packages**: Global via pnpm install -g
-4. **UV Tools**: Global via uv tool install
+1. **PostgreSQL Repository Setup**: Idempotent APT repo configuration with GPG verification (Debian/Ubuntu)
+2. **Scripts**: Download via wget/curl, execute with /bin/sh
+3. **System Packages**: OS-aware (apt-get, pacman, brew) with platform defaults
+4. **NPM Packages**: Global via pnpm install -g
+5. **UV Tools**: Global via uv tool install
 
 **Key Functions**:
+- `setup_postgresql_repo()` - Configure PGDG repository with GPG verification (idempotent)
 - `install_scripts()` - Download and execute shell scripts with progress
-- `install_system_packages()` - OS detection and package manager invocation
+- `install_system_packages()` - OS detection and package manager invocation (runs after PostgreSQL repo setup)
 - `install_npm_packages()` - Parallel npm package installation
 - `install_uv_tools()` - Parallel UV tool installation
 
@@ -66,7 +70,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `utils.py` (275 LOC)
+### `utils.py` (277 LOC)
 **Purpose**: Configuration validation, platform detection, utilities
 
 **Pydantic Models**:
@@ -128,7 +132,7 @@ class TaskResult:
 
 ---
 
-### `postgres.py` (191 LOC)
+### `postgres.py` (173 LOC)
 **Purpose**: PostgreSQL user management for Odoo development
 
 **Responsibilities**:
@@ -205,7 +209,9 @@ This enables flexible deployment: developers can customize the base directory vi
 | `rich` | Latest | Terminal UI (progress bars, colors, trees) |
 | `gitpython` | Latest | Programmatic git operations |
 | `tomllib` | Built-in (Python 3.11+) | TOML parsing for Python 3.11+ |
-| `tomli` | Latest (optional) | TOML parsing fallback for Python < 3.11 |
+| `tomli` | Latest | TOML parsing fallback for Python < 3.11 |
+
+**Note**: Rich is used extensively throughout for progress bars, colored output, and tree display.
 
 ---
 

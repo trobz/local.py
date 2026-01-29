@@ -23,6 +23,7 @@ Four-layer modular design with clear separation of concerns:
 - **Line Length**: Max 120 characters (ruff.toml config)
 - **Import Order**: stdlib → third-party → local (ruff-managed)
 - **Active Rules**: YTT, S (security), B, A, C4, T10, SIM, I, C90, E, W, F, PGH, UP, RUF, TRY
+- **UI Library**: Rich (progress bars, colored output, trees)
 
 ### Type Safety (Mandatory)
 - All function signatures must have type hints
@@ -170,11 +171,11 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## File Structure
 
-**Max file size**: 500 LOC (split if larger)
-- `main.py`: CLI commands and orchestration (473+ LOC)
-- `installers.py`: Installation strategies (282 LOC)
-- `postgres.py`: PostgreSQL user management (191 LOC)
-- `utils.py`: Config, platform detection, helpers (264 LOC)
+**Target file size**: 500 LOC; main.py at 523 LOC is exception due to command density.
+- `main.py`: CLI commands and orchestration (523 LOC - consolidates 5 command implementations)
+- `installers.py`: Installation strategies (389 LOC - 5 installation strategies)
+- `postgres.py`: PostgreSQL user management (173 LOC)
+- `utils.py`: Config, platform detection, helpers (277 LOC)
 - `concurrency.py`: Task runner with progress (60 LOC)
 - `exceptions.py`: Custom exception classes (38 LOC)
 - `tests/`: pytest unit tests for all modules

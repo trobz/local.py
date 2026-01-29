@@ -4,7 +4,8 @@ export DEBIAN_FRONTEND=noninteractive
 export PATH="$HOME/.local/bin:$PATH"
 
 # Bootstrap script for trobz_local (tlc)
-# Installs: uv, git, gh, and the trobz_local package
+# Installs prerequisites: git, gh, uv, and trobz_local CLI
+# Note: Tool installation (Odoo, PostgreSQL, etc.) is done separately via `tlc install-tools`
 
 echo "=== Bootstrap trobz_local ==="
 
@@ -40,33 +41,6 @@ detect_os() {
 
 OS=$(detect_os)
 echo "Detected OS: $OS"
-
-# Install prerequisite packages (Debian/Ubuntu only)
-install_prerequisites() {
-    if [[ "$OS" != "debian" ]]; then
-        return
-    fi
-    echo "Installing prerequisite packages..."
-    sudo apt-get update
-    sudo apt-get install -y apt-utils apt-transport-https lsb-release
-}
-
-# Add PostgreSQL APT repository (Debian/Ubuntu only)
-setup_postgresql_repo() {
-    if [[ "$OS" != "debian" ]]; then
-        return
-    fi
-    if [ -f /usr/share/keyrings/postgresql-keyring.gpg ]; then
-        echo "PostgreSQL APT repository already configured"
-        return
-    fi
-    echo "Adding PostgreSQL APT repository..."
-    local codename
-    codename=$(lsb_release -cs)
-    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/postgresql-keyring.gpg] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
-    sudo apt-get update
-}
 
 # Install git
 install_git() {
@@ -132,9 +106,7 @@ install_trobz_local() {
     echo "trobz_local installed (CLI: tlc)"
 }
 
-# Main
-install_prerequisites
-setup_postgresql_repo
+# Main execution
 install_git
 install_gh
 install_uv
@@ -143,4 +115,23 @@ install_trobz_local
 
 echo ""
 echo "=== Bootstrap complete ==="
-echo "Run 'tlc --help' to get started"
+echo ""
+echo "Prerequisites installed successfully!"
+echo "  ✓ git"
+echo "  ✓ gh (GitHub CLI)"
+echo "  ✓ uv"
+echo "  ✓ trobz_local (tlc command available)"
+echo ""
+echo "Next steps:"
+echo ""
+echo "  1. Install development tools (Odoo, PostgreSQL, etc.):"
+echo "     tlc install-tools"
+echo ""
+echo "  2. Initialize your development environment:"
+echo "     tlc init              # Create directory structure"
+echo "     tlc pull-repos        # Clone repositories"
+echo "     tlc create-venvs      # Create virtual environments"
+echo ""
+echo "  3. Get help:"
+echo "     tlc --help"
+echo ""
