@@ -41,7 +41,8 @@ Use `TLC_CODE_DIR` environment variable to customize the base directory.
 ### 2. Repository Management (`pull-repos`)
 Clones or updates Odoo and OCA repositories:
 - **Sources**: Official Odoo repos and OCA GitHub repos
-- **Speed**: Shallow clones (depth=1) for bandwidth efficiency
+- **Speed**: Shallow clones (depth=1) by default for bandwidth efficiency
+- **Full History**: Use `--full-history` flag to fetch complete commit history
 - **Parallelization**: Multiple repos cloned/updated simultaneously
 - **Operations**: Clone new repos, fetch and hard-reset existing ones
 
@@ -233,14 +234,39 @@ Clone missing repositories and update existing ones.
 **Options**:
 - `-f, --filter`: Filter repositories by name (repeatable, e.g., `-f server-tools -f web`)
 - `--dry-run`: Preview operations without executing
+- `--full-history`: Fetch full commit history instead of shallow clone (depth=1)
 - `--newcomer / --no-newcomer`: Enable interactive mode (default: True)
 
 **Behavior**:
 - Reads `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`) and loads repo definitions
-- For each version, clones missing repos (shallow, depth=1) or updates existing ones
+- For each version, clones missing repos (shallow, depth=1 by default) or updates existing ones
 - Updates via: git fetch, checkout branch, hard reset to origin/branch
 - Executes up to 4 repos in parallel
 - Uses GitProgress for progress reporting
+
+**Examples**:
+```bash
+# Shallow clone (default, faster, less bandwidth)
+tlc pull-repos
+
+# Full clone (complete commit history)
+tlc pull-repos --full-history
+
+# Filter specific repos with full history
+tlc pull-repos --filter odoo --full-history
+```
+
+**When to use --full-history**:
+- Need to browse full git history
+- Performing git bisect operations
+- Analyzing commit patterns over time
+- Contributing patches based on historical context
+
+**Default behavior (depth=1)**:
+- Faster downloads (less data transferred)
+- Smaller disk usage
+- Sufficient for most development workflows
+- Can be "unshallowed" later with `git fetch --unshallow`
 
 **Exit Codes**: 0 on success, 1 if any repo operation fails
 
