@@ -9,7 +9,7 @@ Four-layer modular design with clear separation of concerns:
 | Layer | Module(s) | Responsibility |
 |---|---|---|
 | **CLI Layer** | `main.py` | Command routing, user interaction, newcomer mode |
-| **Implementation** | `installers.py` | Four installation strategies (script, system, npm, uv) |
+| **Implementation** | `installers.py`, `postgres.py` | Installation strategies (script, system, npm, uv); PostgreSQL user management |
 | **Utility Layer** | `utils.py` | Config validation, platform detection, helpers |
 | **Infrastructure** | `concurrency.py`, `exceptions.py` | Parallel execution, custom exceptions |
 
@@ -67,16 +67,18 @@ Config validated at startup. Early detection prevents side effects on invalid in
 - **Never use shell=True** - Always pass arguments as list
 - **Full paths only** - Use shutil.which() instead of relying on PATH
 - **No user input in commands** - Build commands from validated config only
+- **SQL injection prevention** - Use psql variable binding (`:\"identifier\"` for names, `:'string'` for values) instead of string interpolation
 
 ### Download Security
 - **HTTPS enforcement** - Pydantic validator rejects non-HTTPS URLs
 - **Trusted sources only** - Script URLs must be whitelisted or reviewed
 
 ### Input Validation
-- **Regex patterns** - All config fields validated with specific patterns:
+- **Regex patterns** - All config fields and identifiers validated with specific patterns:
   - Versions: `^\d+\.\d+$`
   - UV tools: `^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$`
   - Repo names: `^[a-zA-Z0-9._-]+$`
+  - PostgreSQL usernames: `^[a-zA-Z_][a-zA-Z0-9_]{0,62}$` (max 63 chars, alphanumeric + underscore)
 - **Pydantic models** - No ad-hoc parsing of config
 - **Ruff S* rules** - Security linting enabled in make check
 
@@ -169,8 +171,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ## File Structure
 
 **Max file size**: 500 LOC (split if larger)
-- `main.py`: CLI commands and orchestration (452 LOC)
+- `main.py`: CLI commands and orchestration (473+ LOC)
 - `installers.py`: Installation strategies (282 LOC)
+- `postgres.py`: PostgreSQL user management (191 LOC)
 - `utils.py`: Config, platform detection, helpers (264 LOC)
 - `concurrency.py`: Task runner with progress (60 LOC)
 - `exceptions.py`: Custom exception classes (38 LOC)

@@ -58,18 +58,29 @@ Creates Odoo-specific environments:
 - Parallelized creation for multiple versions
 - Preset: demo, Python: 3.12
 
-### 5. Interactive Mode
+### 5. PostgreSQL User Management (`ensure-db-user`)
+Verify or create PostgreSQL user for Odoo development:
+- Checks PostgreSQL availability via `pg_isready`
+- Verifies "odoo" user exists with CREATEDB permission
+- Creates user if missing (hardcoded credentials: odoo/odoo for dev-only)
+- OS-aware execution (Linux: sudo -u postgres | macOS: direct access)
+- Connection testing with created credentials
+- Security: Input validation, SQL injection prevention via psql variable binding
+
+### 6. Interactive Mode
 **Newcomer Mode** (default enabled, can disable with `--newcomer=false`):
 - Confirmation prompts before operations
 - Detailed messages explaining actions
 - Helps new developers understand workflow
 - Can be disabled via flag or `NEWCOMER_MODE` environment variable
 
-### 6. Security
+### 7. Security
 - HTTPS-only enforcement for script downloads
 - No shell injection vulnerabilities (no shell=True)
 - Subprocess safety with explicit executable paths
 - Configuration validation via Pydantic
+- SQL injection prevention via psql variable binding (ensure-db-user)
+- Input validation for PostgreSQL identifiers (usernames)
 
 ## Functional Requirements
 
@@ -79,8 +90,9 @@ Creates Odoo-specific environments:
 | **FR-2: Repository Operations** | Clone repos with `depth=1`, update via fetch+reset, support parallelization, allow name filtering |
 | **FR-3: Virtual Environments** | Create venvs for each Odoo version using `odoo-venv`, support parallel creation |
 | **FR-4: Tool Installation** | Four-stage pipeline: scripts → system packages → npm → uv tools; OS-aware package managers |
-| **FR-5: Configuration** | TOML config at `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`), strict Pydantic validation, clear error messages with examples |
-| **FR-6: User Interaction** | Interactive "newcomer mode", dry-run preview, rich console UI (progress bars, trees, colors) |
+| **FR-5: PostgreSQL User** | Verify/create PostgreSQL "odoo" user with CREATEDB permission; OS-aware execution (Linux sudo, macOS direct); connection validation |
+| **FR-6: Configuration** | TOML config at `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`), strict Pydantic validation, clear error messages with examples |
+| **FR-7: User Interaction** | Interactive "newcomer mode", dry-run preview, rich console UI (progress bars, trees, colors) |
 
 ## Non-Functional Requirements
 
@@ -289,6 +301,40 @@ Install tools from four sources in order: scripts, system packages, npm, uv.
 - Aggregates results and reports failures
 
 **Exit Codes**: 0 on success, 1 if any tool installation fails
+
+---
+
+### `tlc ensure-db-user`
+Verify or create PostgreSQL user "odoo" for Odoo development.
+
+**Usage**: `tlc ensure-db-user`
+
+**Behavior**:
+- Checks if PostgreSQL is running on localhost via `pg_isready`
+- Verifies PostgreSQL user "odoo" exists
+- Creates user with CREATEDB permission if missing (hardcoded dev credentials)
+- Tests connection with created user
+- OS-aware execution:
+  - **Linux**: Executes as `postgres` user via `sudo -n -u postgres`
+  - **macOS**: Direct execution (PostgreSQL via Homebrew runs as current user)
+
+**Security**:
+- Input validation for PostgreSQL identifiers (max 63 chars, alphanumeric + underscore)
+- SQL injection prevention via psql variable binding (`:\"username\"` for identifiers, `:'password'` for values)
+- Secure environment variable handling for credentials
+
+**Exit Codes**:
+- `0` - User ready for Odoo development
+- `1` - PostgreSQL not running
+- `2` - Sudo authentication failed (Linux)
+- `3` - User creation failed or connection test failed
+
+**Prerequisites**:
+- PostgreSQL server running on localhost
+- `pg_isready` and `psql` installed
+- On Linux: user must have passwordless sudo access to postgres user
+
+**Security Warning**: Uses hardcoded dev-only credentials (odoo:odoo). Never use in production.
 
 ---
 
