@@ -6,24 +6,23 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 | Metric | Value |
 |---|---|
-| **Language** | Python 3.10+ |
-| **Core LOC** | 1,109 lines (production code across 6 files) |
-| **Test LOC** | 613 lines (4 test files, 69% coverage, 20 passing tests) |
-| **Core Modules** | 6 files: main (455), installers (282), utils (274), concurrency (60), exceptions (38), __init__ (0) |
-| **Test Modules** | test_pull_repos (211), test_install_tools (253), test_create_venvs (123), test_utils (26) |
+| **Language** | Python 3.12+ |
+| **Total LOC** | ~1,287 lines (core logic) + tests |
+| **Core Modules** | 7 files (main, installers, utils, postgres, concurrency, exceptions, \__init\_\_) |
+| **Test Modules** | tests/ directory with pytest unit tests |
 | **Primary Frameworks** | Typer (CLI), Pydantic (validation), Rich (UI), GitPython (git) |
 | **Concurrency Model** | ThreadPoolExecutor, max 4 workers, I/O-bound tasks |
 | **License** | AGPL-3.0 |
 
 ## Module Breakdown
 
-### `main.py` (455 LOC)
+### `main.py` (473+ LOC)
 **Purpose**: CLI entry point and command orchestration
 
 **Responsibilities**:
-- Define Typer application with 4 main commands
+- Define Typer application with 5 main commands
 - Manage "newcomer mode" state (interactive confirmations)
-- Orchestrate calls to installers, git operations, and venv creation
+- Orchestrate calls to installers, git operations, venv creation, and PostgreSQL user management
 - Handle user interaction and progress reporting
 
 **Key Commands**:
@@ -31,6 +30,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 - `pull-repos`: Clone/update repositories
 - `create-venvs`: Create Python virtual environments
 - `install-tools`: Install from four sources
+- `ensure-db-user`: Verify/create PostgreSQL user
 
 **Key Functions**:
 - `main()` - Typer callback and default behavior
@@ -39,6 +39,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 - `_create_venvs()` - venv creation worker via odoo-venv
 - `_run_installers()` - Orchestrate four-stage installer pipeline
 - `_build_install_message()` - Format preview message for tools
+- `ensure_db_user()` - PostgreSQL user management orchestrator
 
 ---
 
@@ -124,6 +125,33 @@ class TaskResult:
 - `ScriptExecutionError(script_name, reason)` - Script execution failures
 - `PackageInstallError(package, reason)` - Installation failures
 - `ExecutableNotFoundError(executable)` - Missing system executables
+
+---
+
+### `postgres.py` (191 LOC)
+**Purpose**: PostgreSQL user management for Odoo development
+
+**Responsibilities**:
+- OS-aware PostgreSQL operations (Linux sudo vs macOS direct)
+- Validate PostgreSQL identifiers and credentials
+- Check PostgreSQL availability and user existence
+- Create PostgreSQL users with CREATEDB permission
+- Test database connections with created credentials
+
+**Key Functions**:
+- `_get_psql_base_cmd(system)` - Get OS-specific psql command prefix
+- `validate_username(username)` - Validate PostgreSQL identifier format
+- `validate_password(password)` - Validate password non-empty
+- `check_postgres_running()` - Test PostgreSQL availability via pg_isready
+- `check_user_exists(username, system)` - Check if user exists in PostgreSQL
+- `create_user(username, password, system)` - Create user with CREATEDB, returns (success, error_msg)
+- `verify_connection(host, user, password)` - Test connection with credentials
+
+**Security Pattern**:
+- Input validation: Regex-validated usernames (max 63 chars, alphanumeric + underscore)
+- SQL injection prevention: psql variable binding (`:\"varname\"` for identifiers, `:'varname'` for strings)
+- Environment isolation: Only PGPASSWORD env var passed during connection test
+- No shell=True: All subprocess calls use argument lists (noqa: S603)
 
 ---
 

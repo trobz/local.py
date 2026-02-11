@@ -15,11 +15,18 @@ from .installers import (
     install_system_packages,
     install_uv_tools,
 )
+from .postgres import (
+    check_postgres_running,
+    check_user_exists,
+    create_user,
+    verify_connection,
+)
 from .utils import (
     GitProgress,
     confirm_step,
     get_code_root,
     get_config,
+    get_os_info,
     get_uv_path,
 )
 
@@ -261,7 +268,7 @@ def _build_install_message(tools_config: dict) -> str:
             msg += f"  - {pkg}\n"
 
     if tools_config.get("npm"):
-        msg += "\n[3] NPM packages (via pnpm -g):\n"
+        msg += "\n[3] NPM packages (via npm -g):\n"
         for pkg in tools_config["npm"]:
             msg += f"  - {pkg}\n"
 
@@ -450,3 +457,62 @@ def _create_venvs(
     except Exception as e:
         progress.update(task_id, description=f"[red]✗ Error venv {version}: {e}")
         raise
+
+
+@app.command()
+def ensure_db_user(ctx: typer.Context):
+    """Ensure PostgreSQL user exists for Odoo development."""
+    username = "odoo"
+    password = "odoo"  # noqa: S105
+    host = "localhost"
+
+    confirm_step(
+        ctx,
+        "This command will verify/create PostgreSQL user 'odoo' with CREATEDB permission.\n"
+        "Credentials: odoo:odoo (dev-only, never use in production)",
+        "ensure-db-user",
+    )
+
+    os_info = get_os_info()
+    system = os_info["system"]
+
+    # Check PostgreSQL is running
+    typer.echo("Checking PostgreSQL status...")
+    if not check_postgres_running():
+        typer.secho("✗ PostgreSQL is not running on localhost", fg=typer.colors.RED)
+        if system == "Darwin":
+            typer.echo("Try: brew services start postgresql")
+        elif system == "Linux":
+            typer.echo("Try: sudo systemctl start postgresql")
+        raise typer.Exit(code=1)
+    typer.secho("✓ PostgreSQL is running", fg=typer.colors.GREEN)
+
+    # Check if user exists
+    typer.echo(f"Checking if user '{username}' exists...")
+    if check_user_exists(username, system):
+        typer.secho(f"✓ User '{username}' already exists", fg=typer.colors.GREEN)
+    else:
+        typer.echo(f"User '{username}' not found, creating...")
+        success, error_msg = create_user(username, password, system)
+        if not success:
+            typer.secho(f"✗ Failed to create user '{username}'", fg=typer.colors.RED)
+            if system == "Linux" and "sudo" in error_msg.lower():
+                typer.echo("Manual instructions:")
+                typer.echo("  sudo -u postgres createuser -s odoo")
+                typer.echo("  sudo -u postgres psql -c \"ALTER USER odoo WITH PASSWORD 'odoo';\"")
+            else:
+                typer.echo(f"Error: {error_msg}")
+            raise typer.Exit(code=1)
+        typer.secho(f"✓ User '{username}' created successfully", fg=typer.colors.GREEN)
+
+    # Test connection
+    typer.echo("Testing connection...")
+    if not verify_connection(host, username, password):
+        typer.secho("✗ Connection test failed", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    typer.secho("✓ Connection successful", fg=typer.colors.GREEN)
+
+    typer.echo()
+    typer.secho(f"✓ PostgreSQL user '{username}' is ready for Odoo development", fg=typer.colors.GREEN)
+    typer.echo()
+    typer.secho("⚠️  WARNING: Using dev-only credentials (odoo:odoo). Never use in production!", fg=typer.colors.YELLOW)
