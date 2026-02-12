@@ -53,6 +53,7 @@ def test_create_venv_success(tmp_path, mock_get_uv_path):
             "tool",
             "run",
             "odoo-venv",
+            "create",
             version,
             "--odoo-dir",
             str(odoo_dir_base / version),

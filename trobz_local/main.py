@@ -439,6 +439,7 @@ def _create_venvs(
             "tool",
             "run",
             "odoo-venv",
+            "create",
             version,
             "--odoo-dir",
             str(odoo_dir),
