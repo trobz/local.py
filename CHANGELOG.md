@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-02-23)
+
+### Bug Fixes
+
+- Update command running odoo-venv
+  ([`593ea78`](https://github.com/trobz/local.py/commit/593ea78b97bf0be4ca0c62e6227aea4735d6291f))
+
+### Features
+
+- **db**: Add ensure-db-user CLI command for PostgreSQL user management
+  ([`661a40f`](https://github.com/trobz/local.py/commit/661a40f8a892c4c2e94f5a13642f5fddb3400cdb))
+
+### Refactoring
+
+- **init**: Use hardcoded defaults with configurable extra dirs
+  ([`949567f`](https://github.com/trobz/local.py/commit/949567f064035184452a136bfbb00cde5ce19dc7))
+
+- **install**: Improve bootstrap and installer architecture
+  ([`a408d99`](https://github.com/trobz/local.py/commit/a408d99c483dd3d1aef7348d31f6316dd12fa737))
+
+
 ## v0.3.0 (2026-01-28)
 
 ### Documentation
