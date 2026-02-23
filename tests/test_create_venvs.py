@@ -53,15 +53,15 @@ def test_create_venv_success(tmp_path, mock_get_uv_path):
             "tool",
             "run",
             "odoo-venv",
+            "create",
             version,
             "--odoo-dir",
             str(odoo_dir_base / version),
             "--venv-dir",
             str(venv_dir_base / version),
             "--preset",
-            "demo",
-            "-p",
-            "3.12",
+            "local",
+            "--verbose",
         ]
         mock_subprocess_run.assert_called_once_with(
             expected_cmd,

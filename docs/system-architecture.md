@@ -62,6 +62,43 @@ High-level design and component interactions in `trobz_local`.
 
 ## Command Flow Diagrams
 
+### `bootstrap.sh` (Prerequisites Installation)
+```
+User runs bootstrap.sh
+    │
+    ├─ Check sudo privileges
+    │   └─ Verify user can run sudo without password
+    │
+    ├─ Detect OS
+    │   ├─ Debian/Ubuntu: apt/dpkg detection
+    │   ├─ Fedora: dnf detection
+    │   ├─ Arch: pacman detection
+    │   └─ macOS: brew detection
+    │
+    ├─ Install git (skip if already installed)
+    │   └─ OS-specific package manager
+    │
+    ├─ Install gh (GitHub CLI, skip if already installed)
+    │   ├─ Debian: Add GitHub official APT repository with GPG verification
+    │   ├─ Fedora/Arch: Package manager
+    │   └─ macOS: brew
+    │
+    ├─ Install uv (skip if already installed)
+    │   └─ curl -LsSf https://astral.sh/uv/install.sh | sh
+    │
+    ├─ Setup SSH known_hosts for GitHub
+    │   ├─ Create ~/.ssh directory (700 permissions)
+    │   └─ Add github.com to known_hosts via ssh-keyscan
+    │
+    ├─ Install trobz_local (tlc)
+    │   └─ uv tool install git+https://github.com/trobz/local.py.git
+    │
+    └─ Display completion message with next steps
+        └─ Recommend: tlc install-tools, tlc init, tlc pull-repos, tlc create-venvs
+```
+
+---
+
 ### `tlc init` Flow
 ```
 init command
@@ -119,6 +156,7 @@ install-tools command
     ├─ Validate config
     │
     ├─ Build installation preview:
+    │   - PostgreSQL repo (Debian/Ubuntu only)
     │   - Scripts: list URLs
     │   - System packages: list packages
     │   - NPM packages: list packages
@@ -127,25 +165,31 @@ install-tools command
     ├─ Show confirmation (newcomer mode)
     │   └─ If --dry-run: show preview, exit 0
     │
-    ├─ Execute four installers in sequence:
-    │   1. install_scripts()
+    ├─ Execute five installers in sequence:
+    │   1. setup_postgresql_repo() [Debian/Ubuntu only, idempotent]
+    │       ├─ Check if PGDG repo already configured
+    │       ├─ If missing, add PGDG APT repository
+    │       ├─ Download and verify GPG key
+    │       └─ Update apt sources
+    │
+    │   2. install_scripts()
     │       ├─ Create temp directory
     │       ├─ For each script:
     │       │   ├─ Download via wget or curl
     │       │   └─ Execute with /bin/sh
     │       └─ Clean up temp directory
     │
-    │   2. install_system_packages()
+    │   3. install_system_packages()
     │       ├─ Detect OS (Arch, Ubuntu, macOS)
     │       ├─ Merge user packages with platform defaults
     │       ├─ Run package manager with sudo
     │       └─ Return success/failure boolean
     │
-    │   3. install_npm_packages()
+    │   4. install_npm_packages()
     │       ├─ Check if pnpm exists
     │       └─ Parallel: run_tasks() with pnpm install -g
     │
-    │   4. install_uv_tools()
+    │   5. install_uv_tools()
     │       └─ Parallel: run_tasks() with uv tool install
     │
     ├─ Aggregate all results
@@ -174,6 +218,41 @@ create-venvs command
     │
     ├─ Aggregate TaskResults
     └─ Report failures, exit 0 or 1
+```
+
+---
+
+### `tlc ensure-db-user` Flow
+```
+ensure-db-user command
+    │
+    ├─ Check PostgreSQL availability
+    │   └─ Run pg_isready on localhost
+    │       └─ If failed: print error message, exit 1
+    │
+    ├─ Detect OS (Darwin vs Linux)
+    │   └─ Set execution method:
+    │       ├─ macOS (Darwin): Direct psql execution
+    │       └─ Linux: sudo -n -u postgres psql (requires passwordless sudo)
+    │
+    ├─ Check if PostgreSQL user "odoo" exists
+    │   └─ Query system catalog via psql
+    │
+    ├─ If user missing:
+    │   ├─ Create user "odoo" with hardcoded dev password
+    │   ├─ Grant CREATEDB privilege
+    │   └─ Validate user creation via psql query
+    │
+    ├─ Test connection with created credentials
+    │   ├─ Connect as "odoo" user to postgres database
+    │   ├─ If successful: print ✓ message
+    │   └─ If failed: print error, exit 3
+    │
+    └─ Exit with appropriate code:
+        ├─ 0 = User ready
+        ├─ 1 = PostgreSQL not running
+        ├─ 2 = Sudo auth failed (Linux)
+        └─ 3 = User creation/connection failed
 ```
 
 ---

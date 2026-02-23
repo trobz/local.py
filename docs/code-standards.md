@@ -9,7 +9,7 @@ Four-layer modular design with clear separation of concerns:
 | Layer | Module(s) | Responsibility |
 |---|---|---|
 | **CLI Layer** | `main.py` | Command routing, user interaction, newcomer mode |
-| **Implementation** | `installers.py` | Four installation strategies (script, system, npm, uv) |
+| **Implementation** | `installers.py`, `postgres.py` | Installation strategies (script, system, npm, uv); PostgreSQL user management |
 | **Utility Layer** | `utils.py` | Config validation, platform detection, helpers |
 | **Infrastructure** | `concurrency.py`, `exceptions.py` | Parallel execution, custom exceptions |
 
@@ -23,6 +23,7 @@ Four-layer modular design with clear separation of concerns:
 - **Line Length**: Max 120 characters (ruff.toml config)
 - **Import Order**: stdlib → third-party → local (ruff-managed)
 - **Active Rules**: YTT, S (security), B, A, C4, T10, SIM, I, C90, E, W, F, PGH, UP, RUF, TRY
+- **UI Library**: Rich (progress bars, colored output, trees)
 
 ### Type Safety (Mandatory)
 - All function signatures must have type hints
@@ -67,6 +68,7 @@ Config validated at startup. Early detection prevents side effects on invalid in
 - **Never use shell=True** - Always pass arguments as list
 - **Full paths only** - Use shutil.which() instead of relying on PATH
 - **No user input in commands** - Build commands from validated config only
+- **SQL injection prevention** - Use psql variable binding (`:\"identifier\"` for names, `:'string'` for values) instead of string interpolation
 
 ### Download Security
 - **HTTPS enforcement** - Pydantic validator rejects non-HTTPS URLs
@@ -77,6 +79,7 @@ Config validated at startup. Early detection prevents side effects on invalid in
   - Versions: `^(?:\d+\.\d+|master)$` (supports semver and "master" branch)
   - UV tools: `^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$`
   - Repo names: `^[a-zA-Z0-9._-]+$`
+  - PostgreSQL usernames: `^[a-zA-Z_][a-zA-Z0-9_]{0,62}$` (max 63 chars, alphanumeric + underscore)
 - **Pydantic models** - No ad-hoc parsing of config
 - **Ruff S* rules** - Security linting enabled in make check
 
@@ -168,13 +171,14 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## File Structure
 
-**Max file size**: 500 LOC (split if larger)
-- `main.py`: CLI commands and orchestration (455 LOC)
-- `installers.py`: Installation strategies (283 LOC)
-- `utils.py`: Config, platform detection, helpers (275 LOC)
-- `concurrency.py`: Task runner with progress (61 LOC)
-- `exceptions.py`: Custom exception classes (39 LOC)
-- `tests/`: pytest unit tests (613 LOC total, 69% coverage)
+**Target file size**: 500 LOC; main.py at 523 LOC is exception due to command density.
+- `main.py`: CLI commands and orchestration (523 LOC - consolidates 5 command implementations)
+- `installers.py`: Installation strategies (389 LOC - 5 installation strategies)
+- `postgres.py`: PostgreSQL user management (173 LOC)
+- `utils.py`: Config, platform detection, helpers (277 LOC)
+- `concurrency.py`: Task runner with progress (60 LOC)
+- `exceptions.py`: Custom exception classes (38 LOC)
+- `tests/`: pytest unit tests for all modules
 
 **Imports in each module**:
 - No circular imports

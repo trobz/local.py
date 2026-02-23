@@ -94,6 +94,7 @@ def install_scripts(scripts: list[dict], dry_run: bool = False) -> list:
             - url: HTTPS URL to download
             - name: Optional display name
         dry_run: If True, only show what would be installed
+
     """
     if not scripts:
         return []
@@ -123,8 +124,13 @@ def install_scripts(scripts: list[dict], dry_run: bool = False) -> list:
 def _get_package_manager_config(system: str, distro: str) -> tuple[list[str], list[str]] | None:
     """Get package manager command and default packages for the OS.
 
+    Default package lists (MACOS_PACKAGES, UBUNTU_PACKAGES, ARCH_PACKAGES)
+    include postgresql. On Debian/Ubuntu, setup_postgresql_repo() must run
+    first to add the PGDG repo, otherwise apt installs the older distro version.
+
     Returns:
         Tuple of (command_prefix, default_packages) or None if unsupported.
+
     """
     if system == "Darwin":
         if not shutil.which("brew"):
@@ -191,12 +197,118 @@ def install_system_packages(packages: list[str], dry_run: bool = False) -> bool:
     return False
 
 
-def _install_npm_package(progress: Progress, task_id: TaskID, package: str, pnpm_path: str):
+def setup_postgresql_repo() -> bool:
+    """Setup official PGDG APT repository for Debian/Ubuntu.
+
+    On Debian/Ubuntu, the default distro repos ship older PostgreSQL versions.
+    This adds the official PGDG repo so `apt-get install postgresql` pulls
+    the latest version. Must run before install_system_packages().
+
+    macOS/Arch: No-op — Homebrew and pacman already provide latest PostgreSQL,
+    so the package lists in _get_package_manager_config() are sufficient.
+
+    Idempotent: Skips if keyring already exists.
+
+    Returns:
+        True on success or if already configured (never fails the pipeline)
+
+    """
+    os_info = get_os_info()
+    system = os_info["system"]
+    distro = os_info["distro"]
+
+    # macOS/Arch: no separate repo setup needed — brew/pacman handle it
+    if system == "Darwin" or distro not in ["debian", "ubuntu"]:
+        logger.debug(f"Skipping PostgreSQL repo setup (system: {system}, distro: {distro})")
+        return True
+
+    # Idempotent check: skip if PGDG keyring already installed
+    keyring_path = Path("/usr/share/keyrings/postgresql-keyring.gpg")
+    if keyring_path.exists():
+        typer.echo("✓ PostgreSQL APT repository already configured")
+        return True
+
+    typer.secho("\n--- Setting up PostgreSQL APT Repository ---", fg=typer.colors.BLUE, bold=True)
+
+    try:
+        # Get distribution codename (e.g. "jammy", "bookworm")
+        lsb_release_path = shutil.which("lsb_release")
+        if not lsb_release_path:
+            typer.secho("Warning: lsb_release not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            return True
+
+        result = subprocess.run([lsb_release_path, "-cs"], check=True, capture_output=True, text=True)  # noqa: S603
+        codename = result.stdout.strip()
+
+        curl_path = shutil.which("curl")
+        if not curl_path:
+            typer.secho("Warning: curl not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            return True
+
+        gpg_path = shutil.which("gpg")
+        if not gpg_path:
+            typer.secho("Warning: gpg not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            return True
+
+        # Download and import the official PGDG GPG key
+        typer.echo("Downloading PostgreSQL GPG key...")
+        download_result = subprocess.run(  # noqa: S603
+            [curl_path, "-fsSL", "https://www.postgresql.org/media/keys/ACCC4CF8.asc"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        subprocess.run(  # noqa: S603
+            ["sudo", gpg_path, "--dearmor", "-o", str(keyring_path)],  # noqa: S607
+            input=download_result.stdout,
+            check=True,
+            text=True,
+        )
+
+        # Add PGDG APT source list
+        typer.echo("Adding PostgreSQL APT repository...")
+        repo_line = (
+            f"deb [arch=amd64 signed-by={keyring_path}] https://apt.postgresql.org/pub/repos/apt {codename}-pgdg main"
+        )
+
+        tee_path = shutil.which("tee")
+        if not tee_path:
+            typer.secho("Warning: tee not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            return True
+
+        subprocess.run(  # noqa: S603
+            ["sudo", tee_path, "/etc/apt/sources.list.d/pgdg.list"],  # noqa: S607
+            input=repo_line,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        # Refresh package index to include PGDG packages
+        typer.echo("Updating package list...")
+        subprocess.run(["sudo", "apt-get", "update"], check=True, capture_output=True)  # noqa: S607
+
+        typer.secho("✓ PostgreSQL APT repository configured successfully", fg=typer.colors.GREEN)
+
+    except subprocess.CalledProcessError as e:
+        typer.secho(
+            f"Warning: Failed to setup PostgreSQL repository: {e}\n"
+            "You may need to configure it manually if you need PostgreSQL.",
+            fg=typer.colors.YELLOW,
+        )
+    except Exception as e:
+        typer.secho(f"Warning: Unexpected error during PostgreSQL repo setup: {e}", fg=typer.colors.YELLOW)
+
+    return True  # Always succeeds — never fails the install-tools pipeline
+
+
+def _install_npm_package(progress: Progress, task_id: TaskID, package: str, npm_path: str):
     progress.update(task_id, description=f"Installing {package}...", total=100, completed=0)
 
     try:
         subprocess.run(  # noqa: S603
-            [pnpm_path, "install", "-g", package],
+            [npm_path, "install", "-g", package],
             check=True,
             capture_output=True,
             text=True,
@@ -212,17 +324,16 @@ def install_npm_packages(packages: list[str], dry_run: bool = False) -> list:
     if not packages:
         return []
 
-    pnpm_path = shutil.which("pnpm")
-    if not pnpm_path:
+    npm_path = shutil.which("npm")
+    if not npm_path:
         typer.secho(
-            "Error: pnpm is not installed.\n"
-            "Please add 'pnpm' to system_packages in your config.toml and rerun install-tools.",
+            "Error: npm is not installed. Please install Node.js first.",
             fg=typer.colors.RED,
         )
-        return [TaskResult(name="pnpm-check", success=False, message="pnpm is not installed")]
+        return [TaskResult(name="npm-check", success=False, message="npm is not installed")]
 
     if dry_run:
-        typer.echo("\n[NPM packages - would be installed globally via pnpm]")
+        typer.echo("\n[NPM packages - would be installed globally via npm]")
         for pkg in packages:
             typer.echo(f"  - {pkg}")
         return []
@@ -234,7 +345,7 @@ def install_npm_packages(packages: list[str], dry_run: bool = False) -> list:
         tasks.append({
             "name": package,
             "func": _install_npm_package,
-            "args": {"package": package, "pnpm_path": pnpm_path},
+            "args": {"package": package, "npm_path": npm_path},
         })
 
     return run_tasks(tasks)
