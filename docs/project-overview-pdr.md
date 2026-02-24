@@ -140,10 +140,6 @@ uv = ["odoo-venv", "odoo-addons-path", "pre-commit"]
 npm = ["prettier", "eslint"]
 system_packages = ["git", "postgresql"]
 
-[[tools.script]]
-url = "https://astral.sh/uv/install.sh"
-name = "uv installer"
-
 [repos]
 odoo = ["odoo", "enterprise"]
 oca = ["server-tools", "server-ux", "web"]
@@ -181,8 +177,8 @@ Shell scripts to download and execute
 - **Example**:
   ```toml
   [[tools.script]]
-  url = "https://astral.sh/uv/install.sh"
-  name = "uv installer"
+  url = "https://example.com/install.sh"
+  name = "my installer"
   ```
 
 #### `tools.system_packages` (Optional)
