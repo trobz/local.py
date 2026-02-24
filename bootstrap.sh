@@ -9,6 +9,13 @@ export PATH="$HOME/.local/bin:$PATH"
 
 echo "=== Bootstrap trobz_local ==="
 
+# Check not running as root
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Error: Do not run this script as root."
+    echo "Please run as a regular user with sudo access."
+    exit 1
+fi
+
 # Check if user can sudo
 check_sudo() {
     if ! sudo -v &>/dev/null; then
