@@ -1,0 +1,33 @@
+versions = ["14.0", "15.0", "16.0", "17.0", "18.0"]
+
+[tools]
+uv = [
+    "odoo-venv",
+    "odoo-addons-path",
+    "pre-commit",
+]
+
+npm = [
+    "prettier",
+]
+
+[[tools.script]]
+name = "uv"
+url = "https://astral.sh/uv/install.sh"
+
+[[tools.script]]
+name = "nvm"
+url = "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh"
+
+system_packages = []
+
+[repos]
+odoo = [
+    "odoo",
+    "enterprise",
+]
+
+oca = [
+    "server-tools",
+    "server-ux",
+]
