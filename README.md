@@ -87,7 +87,7 @@ versions = ["16.0", "17.0", "18.0"]
 [tools]
 uv = ["odoo-venv", "odoo-addons-path", "pre-commit"]
 npm = ["prettier", "eslint"]
-system_packages = ["git", "postgresql", "pnpm"]
+system_packages = ["git", "postgresql"]
 
 [[tools.script]]
 url = "https://astral.sh/uv/install.sh"

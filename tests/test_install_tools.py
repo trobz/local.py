@@ -171,7 +171,7 @@ def test_install_system_packages_arch(mock_subprocess, mock_get_config, mock_whi
             "uv": [],
             "npm": [],
             "script": [],
-            "system_packages": ["pnpm"],
+            "system_packages": ["git"],
         }
     }
 
@@ -182,7 +182,7 @@ def test_install_system_packages_arch(mock_subprocess, mock_get_config, mock_whi
     mock_subprocess.assert_called_once()
     call_args = mock_subprocess.call_args[0][0]
     assert "pacman" in call_args
-    assert "pnpm" in call_args
+    assert "git" in call_args
 
 
 @patch("trobz_local.installers.get_os_info")

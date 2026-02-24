@@ -52,7 +52,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 1. **PostgreSQL Repository Setup**: Idempotent APT repo configuration with GPG verification (Debian/Ubuntu)
 2. **Scripts**: Download via wget/curl, execute with /bin/sh
 3. **System Packages**: OS-aware (apt-get, pacman, brew) with platform defaults
-4. **NPM Packages**: Global via pnpm install -g
+4. **NPM Packages**: Global via npm install -g
 5. **UV Tools**: Global via uv tool install
 
 **Key Functions**:

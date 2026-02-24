@@ -67,7 +67,7 @@ Five-stage installation pipeline:
 1. **PostgreSQL Repository** (Debian/Ubuntu only): Setup PGDG APT repository with GPG verification (idempotent)
 2. **Shell Scripts**: Download and execute scripts (e.g., uv installer)
 3. **System Packages**: OS-aware installation via apt/pacman/brew (runs after PostgreSQL repo setup on Debian/Ubuntu)
-4. **NPM Packages**: Global packages via pnpm
+4. **NPM Packages**: Global packages via npm
 5. **UV Tools**: Python tools via uv tool install
 
 ### 4. Virtual Environment Management (`create-venvs`)
@@ -138,7 +138,7 @@ versions = ["16.0", "17.0", "18.0"]
 [tools]
 uv = ["odoo-venv", "odoo-addons-path", "pre-commit"]
 npm = ["prettier", "eslint"]
-system_packages = ["git", "postgresql", "pnpm"]
+system_packages = ["git", "postgresql"]
 
 [[tools.script]]
 url = "https://astral.sh/uv/install.sh"
@@ -166,7 +166,7 @@ UV tools to install globally via `uv tool install`
 - **Examples**: `["odoo-venv", "pre-commit", "black[d]>=24.0"]`
 
 #### `tools.npm` (Optional)
-NPM packages to install globally via pnpm
+NPM packages to install globally via npm
 - **Type**: List of strings
 - **Pattern**: `^(@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$`
 - **Supports**: Scoped (@org/package) and unscoped packages
@@ -310,7 +310,7 @@ Install tools from five sources in order: PostgreSQL repo, scripts, system packa
 1. **PostgreSQL Repository** (Debian/Ubuntu): Setup PGDG APT repository with GPG verification
 2. **Scripts**: Download and execute via `wget` or `curl`, then `sh`
 3. **System Packages**: OS-aware installation (apt/pacman/brew) - runs after PostgreSQL repo on Debian/Ubuntu
-4. **NPM Packages**: Global installation via `pnpm install -g`
+4. **NPM Packages**: Global installation via `npm install -g`
 5. **UV Tools**: Global installation via `uv tool install`
 
 **Behavior**:

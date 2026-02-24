@@ -186,8 +186,8 @@ install-tools command
     │       └─ Return success/failure boolean
     │
     │   4. install_npm_packages()
-    │       ├─ Check if pnpm exists
-    │       └─ Parallel: run_tasks() with pnpm install -g
+    │       ├─ Check if npm exists
+    │       └─ Parallel: run_tasks() with npm install -g
     │
     │   5. install_uv_tools()
     │       └─ Parallel: run_tasks() with uv tool install
@@ -354,9 +354,9 @@ install_tools request
         │       └─ Execute with sudo
         │
         ├─ NPM Packages
-        │   ├─ Check: which pnpm
+        │   ├─ Check: which npm
         │   ├─ For each package:
-        │   │   └─ pnpm install -g {package}
+        │   │   └─ npm install -g {package}
         │   └─ Parallel via run_tasks()
         │
         └─ UV Tools
