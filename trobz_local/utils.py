@@ -2,6 +2,7 @@ import os
 import platform
 import re
 import shutil
+from importlib.resources import files
 from pathlib import Path
 
 import git
@@ -162,40 +163,7 @@ def get_uv_path():
 
 
 def show_config_instructions():
-    content = """versions = ["14.0", "15.0", "16.0", "17.0", "18.0"]
-
-[tools]
-uv = [
-    "odoo-venv",
-    "odoo-addons-path",
-    "pre-commit",
-]
-
-npm = [
-    "prettier",
-]
-
-[[tools.script]]
-name = "uv"
-url = "https://astral.sh/uv/install.sh"
-
-[[tools.script]]
-name = "nvm"
-url = "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh"
-
-system_packages = []
-
-[repos]
-odoo = [
-    "odoo",
-    "enterprise",
-]
-
-oca = [
-    "server-tools",
-    "server-ux",
-]
-"""
+    content = files("trobz_local").joinpath("assets/odoo_dev.toml").read_text()
     typer.secho("Config file not found.", fg=typer.colors.YELLOW)
     code_root = get_code_root()
     typer.echo(f"Please create {code_root}/config.toml with content like this:")

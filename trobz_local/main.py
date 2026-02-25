@@ -47,12 +47,18 @@ def main(
         help="Enable newcomer mode with confirmations and help.",
         envvar="NEWCOMER_MODE",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip all confirmations (non-interactive mode).",
+    ),
 ):
     """
     Hi, I'm a CLI to help you setup and manage your local environment for Odoo development.
     """
     ctx.ensure_object(dict)
-    ctx.obj["newcomer"] = newcomer
+    ctx.obj["newcomer"] = newcomer and not yes
     if ctx.invoked_subcommand is None:
         _run_init(ctx)
 
@@ -281,7 +287,9 @@ def _build_install_message(tools_config: dict) -> str:
     return msg
 
 
-def _run_installers(tools_config: dict, dry_run: bool) -> tuple[list, bool]:
+def _run_installers(
+    tools_config: dict, dry_run: bool, install_default_system_packages: bool = True
+) -> tuple[list, bool]:
     all_results = []
     any_failed = False
 
@@ -303,14 +311,12 @@ def _run_installers(tools_config: dict, dry_run: bool) -> tuple[list, bool]:
     if not dry_run:
         setup_postgresql_repo()
 
-    if tools_config.get("system_packages"):
-        success = install_system_packages(tools_config["system_packages"], dry_run)
-        if not success:
-            any_failed = True
-
-            all_results.append(
-                TaskResult(name="system-packages", success=False, message="System package installation failed")
-            )
+    success = install_system_packages(tools_config.get("system_packages", []), dry_run, install_default_system_packages)
+    if not success:
+        any_failed = True
+        all_results.append(
+            TaskResult(name="system-packages", success=False, message="System package installation failed")
+        )
 
     if tools_config.get("npm"):
         results = install_npm_packages(tools_config["npm"], dry_run)
@@ -331,6 +337,7 @@ def _run_installers(tools_config: dict, dry_run: bool) -> tuple[list, bool]:
 def install_tools(
     ctx: typer.Context,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed without executing."),
+    install_default_system_packages: bool = typer.Option(True, help="Install default OS system packages."),
 ):
     """
     Install tools using uv tool based on config.
@@ -353,7 +360,7 @@ def install_tools(
     msg = _build_install_message(tools_config)
     confirm_step(ctx, msg, "install-tools")
 
-    all_results, any_failed = _run_installers(tools_config, dry_run)
+    all_results, any_failed = _run_installers(tools_config, dry_run, install_default_system_packages)
 
     if not dry_run:
         if any_failed:

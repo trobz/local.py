@@ -156,10 +156,7 @@ def _run_package_install(cmd: list[str], packages: list[str]) -> bool:
     return True
 
 
-def install_system_packages(packages: list[str], dry_run: bool = False) -> bool:
-    if not packages:
-        return True
-
+def install_system_packages(packages: list[str], dry_run: bool = False, install_defaults: bool = True) -> bool:
     os_info = get_os_info()
     system = os_info["system"]
     distro = os_info["distro"]
@@ -177,8 +174,9 @@ def install_system_packages(packages: list[str], dry_run: bool = False) -> bool:
 
     cmd, default_packages = config
 
-    # Merge user packages with default packages
-    all_packages = list(dict.fromkeys(default_packages + packages))
+    all_packages = list(dict.fromkeys((default_packages if install_defaults else []) + packages))
+    if not all_packages:
+        return True
 
     if dry_run:
         typer.echo(f"\n[System packages - would be installed via {cmd[0]}]")
