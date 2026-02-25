@@ -47,12 +47,18 @@ def main(
         help="Enable newcomer mode with confirmations and help.",
         envvar="NEWCOMER_MODE",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip all confirmations (non-interactive mode).",
+    ),
 ):
     """
     Hi, I'm a CLI to help you setup and manage your local environment for Odoo development.
     """
     ctx.ensure_object(dict)
-    ctx.obj["newcomer"] = newcomer
+    ctx.obj["newcomer"] = newcomer and not yes
     if ctx.invoked_subcommand is None:
         _run_init(ctx)
 
