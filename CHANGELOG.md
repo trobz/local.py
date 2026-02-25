@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v0.5.0 (2026-02-25)
+
+### Bug Fixes
+
+- Always install default system packages in install-tools
+  ([`04bb2a4`](https://github.com/trobz/local.py/commit/04bb2a4ea2a8eb3c8d0d09bc5c7e46137d38b675))
+
+- Prevent bootstrap.sh from running as root
+  ([`491f7d2`](https://github.com/trobz/local.py/commit/491f7d2bd3b5a47fb63c1b7f24fec27b2573f62f))
+
+### Documentation
+
+- Remove uv script entry from project-overview-pdr example config
+  ([`1af9e5f`](https://github.com/trobz/local.py/commit/1af9e5f0d493824f7cdb83adf4a85c0dcceb8d83))
+
+- Remove uv script entry from README example config
+  ([`2f4648c`](https://github.com/trobz/local.py/commit/2f4648c103184f702e9c8b5d8bad67f41b887b5a))
+
+### Features
+
+- Add -y/--yes flag for non-interactive mode
+  ([`c9d95ef`](https://github.com/trobz/local.py/commit/c9d95efbc888e59e9367216813311b1c6e302d65))
+
+### Refactoring
+
+- Extract config example to assets/odoo_dev.toml
+  ([`86dbd18`](https://github.com/trobz/local.py/commit/86dbd18aba985a4200037d51ba4205d57fe85690))
+
+
 ## v0.4.0 (2026-02-23)
 
 ### Bug Fixes
