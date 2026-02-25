@@ -24,10 +24,11 @@ def mock_typer_confirm():
 
 
 @patch("trobz_local.main.setup_postgresql_repo", return_value=True)
+@patch("trobz_local.main.install_system_packages", return_value=True)
 @patch("trobz_local.installers.shutil.which")
 @patch("trobz_local.main.get_config")
 @patch("trobz_local.installers.subprocess.run")
-def test_install_uv_tools(mock_subprocess, mock_get_config, mock_which, _mock_pg):
+def test_install_uv_tools(mock_subprocess, mock_get_config, mock_which, _mock_sys_pkgs, _mock_pg):
     mock_which.return_value = "/usr/bin/uv"
     mock_get_config.return_value = {
         "tools": {
@@ -133,10 +134,11 @@ def test_install_npm_packages_npm_missing(mock_subprocess, mock_get_config, mock
 
 
 @patch("trobz_local.main.setup_postgresql_repo", return_value=True)
+@patch("trobz_local.main.install_system_packages", return_value=True)
 @patch("trobz_local.installers.shutil.which")
 @patch("trobz_local.main.get_config")
 @patch("trobz_local.installers.subprocess.run")
-def test_install_npm_packages_success(mock_subprocess, mock_get_config, mock_which, _mock_pg):
+def test_install_npm_packages_success(mock_subprocess, mock_get_config, mock_which, _mock_sys_pkgs, _mock_pg):
     mock_which.return_value = "/usr/bin/npm"
     mock_get_config.return_value = {
         "tools": {
