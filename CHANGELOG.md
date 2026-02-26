@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-02-26)
+
+### Features
+
+- Add create_launcher configuration option for venv setup
+  ([`e64e05b`](https://github.com/trobz/local.py/commit/e64e05b5a849ebf3cd33b4c4a694f27fc90bd2d5))
+
+
 ## v0.5.0 (2026-02-25)
 
 ### Bug Fixes
