@@ -400,6 +400,9 @@ def create_venvs(ctx: typer.Context):
 
     msg += "\nFor more information, read at https://github.com/trobz/odoo-venv."
 
+    if config.get("create_launcher", True):
+        msg += "\nLauncher scripts will be created in ~/.local/bin/ (e.g. odoo-v18).\n"
+
     confirm_step(
         ctx,
         msg,
@@ -408,6 +411,7 @@ def create_venvs(ctx: typer.Context):
 
     uv_path = get_uv_path()
     odoo_dir_base = code_root / "odoo" / "odoo"
+    create_launcher = config.get("create_launcher", True)
 
     concurrency_tasks = []
     for version in versions:
@@ -419,6 +423,7 @@ def create_venvs(ctx: typer.Context):
                 "uv_path": uv_path,
                 "odoo_dir_base": odoo_dir_base,
                 "venv_dir_base": venv_dir_base,
+                "create_launcher": create_launcher,
             },
         })
     results = run_tasks(concurrency_tasks)
@@ -434,7 +439,13 @@ def create_venvs(ctx: typer.Context):
 
 
 def _create_venvs(
-    progress: Progress, task_id: TaskID, version: str, uv_path: str, odoo_dir_base: Path, venv_dir_base: Path
+    progress: Progress,
+    task_id: TaskID,
+    version: str,
+    uv_path: str,
+    odoo_dir_base: Path,
+    venv_dir_base: Path,
+    create_launcher: bool = True,
 ):
     progress.update(task_id, description=f"Creating venv for {version}...", total=100, completed=0, start=True)
     odoo_dir = odoo_dir_base / version
@@ -456,6 +467,8 @@ def _create_venvs(
             "local",
             "--verbose",
         ]
+        if create_launcher:
+            cmd.append("--create-launcher")
 
         subprocess.run(  # noqa: S603
             cmd,
