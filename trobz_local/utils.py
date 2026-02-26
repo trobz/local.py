@@ -134,6 +134,7 @@ class ToolsConfig(BaseModel):
 
 class ConfigModel(BaseModel):
     versions: list[str] = Field(default_factory=list)
+    create_launcher: bool = True
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     repos: RepoConfig = Field(default_factory=RepoConfig)
 
