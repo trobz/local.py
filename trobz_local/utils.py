@@ -120,7 +120,7 @@ class GithubToolItem(BaseModel):
 
     name: str
     repo: str
-    version: str
+    version: str = GITHUB_LATEST
     script: str | None = None
 
     @field_validator("repo")
