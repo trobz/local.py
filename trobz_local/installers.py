@@ -445,16 +445,30 @@ def _find_matching_asset(assets: list[dict], system: str, machine: str) -> dict 
     return None
 
 
-def _find_binary_in_names(names: list[str], tool_name: str) -> str | None:
-    """Find the best matching binary path in a list of archive member names."""
-    for name in names:
-        if Path(name).name == tool_name:
-            return name
-    # Fallback: first file without extension
-    for name in names:
-        base = Path(name).name
-        if base and "." not in base and not name.endswith("/"):
-            return name
+_TEXT_EXTENSIONS = {".md", ".txt", ".rst", ".html", ".json", ".yaml", ".yml", ".xml", ".toml", ".ini", ".cfg"}
+_TEXT_FILENAMES = {"LICENSE", "README", "CHANGELOG", "NOTICE", "AUTHORS", "CONTRIBUTING", "INSTALL", "COPYRIGHT"}
+
+
+def _find_binary_member(members: list[tuple[str, int]], tool_name: str) -> str | None:
+    """Find the best matching binary in a list of (archive_path, size) members.
+
+    Priority:
+    1. Exact basename match for tool_name
+    2. Largest file that has no text extension and no known text filename
+    """
+    for member_path, _ in members:
+        if Path(member_path).name == tool_name:
+            return member_path
+
+    candidates = [
+        (size, member_path)
+        for member_path, size in members
+        if Path(member_path).suffix not in _TEXT_EXTENSIONS
+        and Path(member_path).name not in _TEXT_FILENAMES
+        and not member_path.endswith("/")
+    ]
+    if candidates:
+        return max(candidates)[1]  # largest file wins
     return None
 
 
@@ -502,16 +516,18 @@ def _install_github_binary(
 
     if asset_name.endswith((".tar.gz", ".tgz")):
         with tarfile.open(download_path) as tar:
-            member_name = _find_binary_in_names(tar.getnames(), name)
+            members = [(m.name, m.size) for m in tar.getmembers() if m.isfile()]
+            member_name = _find_binary_member(members, name)
             if member_name:
                 f = tar.extractfile(tar.getmember(member_name))
                 if f:
                     install_path.write_bytes(f.read())
     elif asset_name.endswith(".zip"):
         with zipfile.ZipFile(download_path) as zf:
-            binary_name = _find_binary_in_names(zf.namelist(), name)
-            if binary_name:
-                install_path.write_bytes(zf.read(binary_name))
+            members = [(i.filename, i.file_size) for i in zf.infolist() if not i.is_dir()]
+            member_name = _find_binary_member(members, name)
+            if member_name:
+                install_path.write_bytes(zf.read(member_name))
     else:
         shutil.copy2(str(download_path), str(install_path))
 
