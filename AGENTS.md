@@ -27,6 +27,11 @@ make test      # Run pytest
 
 ```
 
+## Git Workflow
+
+- **Never push directly to `main`** — always create a feature branch and open a PR
+- Branch naming: `feat/<short-description>`, `fix/<short-description>`, etc.
+
 ## Key Files
 
 - `Makefile` — Project commands
