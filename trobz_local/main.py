@@ -10,6 +10,7 @@ from rich.tree import Tree
 
 from .concurrency import TaskResult, run_tasks
 from .installers import (
+    install_github_tools,
     install_npm_packages,
     install_scripts,
     install_system_packages,
@@ -256,7 +257,7 @@ def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict):
         raise  # to be caught by run_tasks
 
 
-def _build_install_message(tools_config: dict) -> str:
+def _build_install_message(tools_config: dict) -> str:  # noqa: C901
     msg = "This command will install tools in the following order:\n"
 
     if tools_config.get("script"):
@@ -269,25 +270,36 @@ def _build_install_message(tools_config: dict) -> str:
             hash_status = "✓ verified" if sha256 else "⚠ no hash"
             msg += f"  - {display_name} ({hash_status})\n"
 
+    if tools_config.get("github"):
+        msg += "\n[2] GitHub tools:\n"
+        for tool in tools_config["github"]:
+            name = tool["name"] if isinstance(tool, dict) else tool.name
+            repo = tool["repo"] if isinstance(tool, dict) else tool.repo
+            version = tool["version"] if isinstance(tool, dict) else tool.version
+            script = tool.get("script") if isinstance(tool, dict) else tool.script
+            version_label = "latest release" if version == "latest-release" else version
+            method = f"script: {script}" if script else "binary asset"
+            msg += f"  - {name} ({repo}, {version_label}, {method})\n"
+
     if tools_config.get("system_packages"):
-        msg += "\n[2] System packages:\n"
+        msg += "\n[3] System packages:\n"
         for pkg in tools_config["system_packages"]:
             msg += f"  - {pkg}\n"
 
     if tools_config.get("npm"):
-        msg += "\n[3] NPM packages (via npm -g):\n"
+        msg += "\n[4] NPM packages (via npm -g):\n"
         for pkg in tools_config["npm"]:
             msg += f"  - {pkg}\n"
 
     if tools_config.get("uv"):
-        msg += "\n[4] UV tools:\n"
+        msg += "\n[5] UV tools:\n"
         for tool in tools_config["uv"]:
             msg += f"  - {tool}\n"
 
     return msg
 
 
-def _run_installers(
+def _run_installers(  # noqa: C901
     tools_config: dict, dry_run: bool, install_default_system_packages: bool = True
 ) -> tuple[list, bool]:
     all_results = []
@@ -303,6 +315,21 @@ def _run_installers(
             for s in tools_config["script"]
         ]
         results = install_scripts(scripts, dry_run)
+        all_results.extend(results)
+        if any(not r.success for r in results):
+            any_failed = True
+
+    if tools_config.get("github"):
+        github_tools = [
+            {
+                "name": t["name"] if isinstance(t, dict) else t.name,
+                "repo": t["repo"] if isinstance(t, dict) else t.repo,
+                "version": t["version"] if isinstance(t, dict) else t.version,
+                "script": t.get("script") if isinstance(t, dict) else t.script,
+            }
+            for t in tools_config["github"]
+        ]
+        results = install_github_tools(github_tools, dry_run)
         all_results.extend(results)
         if any(not r.success for r in results):
             any_failed = True
@@ -347,6 +374,7 @@ def install_tools(
 
     has_any = any([
         tools_config.get("script"),
+        tools_config.get("github"),
         tools_config.get("system_packages"),
         tools_config.get("npm"),
         tools_config.get("uv"),

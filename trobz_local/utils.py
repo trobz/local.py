@@ -74,6 +74,11 @@ class InvalidScriptUrlError(ValueError):
         super().__init__(f"Script URL must use HTTPS for security: {url}")
 
 
+class InvalidGithubRepoError(ValueError):
+    def __init__(self, url: str):
+        super().__init__(f"repo must be a GitHub URL (https://github.com/owner/repo): {url}")
+
+
 class InvalidNpmPackageError(ValueError):
     def __init__(self, pkg: str):
         super().__init__(f"Invalid npm package name: {pkg}")
@@ -92,6 +97,9 @@ class RepoConfig(BaseModel):
         return v
 
 
+GITHUB_LATEST = "latest-release"
+
+
 class ScriptItem(BaseModel):
     """Configuration for a script to download and execute."""
 
@@ -107,12 +115,29 @@ class ScriptItem(BaseModel):
         return v
 
 
+class GithubToolItem(BaseModel):
+    """Configuration for a tool installed from a GitHub release."""
+
+    name: str
+    repo: str
+    version: str
+    script: str | None = None
+
+    @field_validator("repo")
+    @classmethod
+    def validate_repo_url(cls, v: str):
+        if not re.match(r"^https://github\.com/[^/]+/[^/]+$", v.rstrip("/")):
+            raise InvalidGithubRepoError(v)
+        return v.rstrip("/")
+
+
 class ToolsConfig(BaseModel):
     """Configuration for tools to install."""
 
     uv: list[str] = Field(default_factory=list)
     npm: list[str] = Field(default_factory=list)
     script: list[ScriptItem] = Field(default_factory=list)
+    github: list[GithubToolItem] = Field(default_factory=list)
     system_packages: list[str] = Field(default_factory=list)
 
     @field_validator("uv")

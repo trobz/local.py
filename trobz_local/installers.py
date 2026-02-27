@@ -1,7 +1,13 @@
+import json
 import logging
+import platform
 import shutil
 import subprocess
+import tarfile
 import tempfile
+import urllib.error
+import urllib.request
+import zipfile
 from pathlib import Path
 
 import typer
@@ -16,6 +22,7 @@ from .exceptions import (
 )
 from .utils import (
     ARCH_PACKAGES,
+    GITHUB_LATEST,
     MACOS_PACKAGES,
     UBUNTU_PACKAGES,
     get_os_info,
@@ -389,3 +396,177 @@ def install_uv_tools(tools: list[str], dry_run: bool = False) -> list:
         })
 
     return run_tasks(tasks)
+
+
+# --- GitHub tool helpers ---
+
+_SYSTEM_KEYWORDS = {
+    "linux": ["linux"],
+    "darwin": ["darwin", "macos", "osx"],
+}
+
+_ARCH_KEYWORDS = {
+    "x86_64": ["x86_64", "amd64"],
+    "aarch64": ["aarch64", "arm64"],
+    "arm64": ["arm64", "aarch64"],
+}
+
+
+def _parse_github_owner_repo(repo_url: str) -> tuple[str, str]:
+    """Extract (owner, repo) from a GitHub URL."""
+    parts = repo_url.removeprefix("https://github.com/").split("/")
+    return parts[0], parts[1]
+
+
+def _fetch_latest_release_tag(owner: str, repo: str) -> str:
+    """Return the tag name of the latest GitHub release."""
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    req = urllib.request.Request(  # noqa: S310
+        url,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "trobz-local"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+            data = json.loads(resp.read())
+        return data["tag_name"]
+    except (urllib.error.URLError, json.JSONDecodeError, KeyError) as e:
+        raise DownloadError(url, str(e)) from e
+
+
+def _find_matching_asset(assets: list[dict], system: str, machine: str) -> dict | None:
+    """Find a release asset matching the current OS and architecture."""
+    sys_keywords = _SYSTEM_KEYWORDS.get(system, [system])
+    arch_keywords = _ARCH_KEYWORDS.get(machine, [machine])
+
+    for asset in assets:
+        name = asset["name"].lower()
+        if any(k in name for k in sys_keywords) and any(k in name for k in arch_keywords):
+            return asset
+    return None
+
+
+def _find_binary_in_names(names: list[str], tool_name: str) -> str | None:
+    """Find the best matching binary path in a list of archive member names."""
+    for name in names:
+        if Path(name).name == tool_name:
+            return name
+    # Fallback: first file without extension
+    for name in names:
+        base = Path(name).name
+        if base and "." not in base and not name.endswith("/"):
+            return name
+    return None
+
+
+def _install_github_binary(
+    progress: Progress, task_id: TaskID, owner: str, repo: str, version: str, name: str, temp_dir: str
+):
+    """Download and install a binary asset from a GitHub release."""
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{version}"
+    req = urllib.request.Request(  # noqa: S310
+        api_url,
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "trobz-local"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310
+            release_data = json.loads(resp.read())
+    except (urllib.error.URLError, json.JSONDecodeError) as e:
+        raise DownloadError(api_url, str(e)) from e
+
+    assets = release_data.get("assets", [])
+    if not assets:
+        raise DownloadError(api_url, "No release assets found")
+
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    asset = _find_matching_asset(assets, system, machine)
+    if asset is None:
+        available = [a["name"] for a in assets]
+        raise DownloadError(api_url, f"No asset matched {system}/{machine}. Available: {available}")
+
+    download_url = asset["browser_download_url"]
+    asset_name = asset["name"]
+    download_path = Path(temp_dir) / asset_name
+
+    progress.update(task_id, description=f"Downloading {name} {version}...", completed=30)
+    download_cmd = _get_download_command(download_url, str(download_path))
+    try:
+        subprocess.run(download_cmd, check=True, capture_output=True, text=True)  # noqa: S603
+    except subprocess.CalledProcessError as e:
+        raise DownloadError(download_url, e.stderr) from e
+
+    progress.update(task_id, description=f"Installing {name}...", completed=70)
+    install_dir = Path.home() / ".local" / "bin"
+    install_dir.mkdir(parents=True, exist_ok=True)
+    install_path = install_dir / name
+
+    if asset_name.endswith((".tar.gz", ".tgz")):
+        with tarfile.open(download_path) as tar:
+            member_name = _find_binary_in_names(tar.getnames(), name)
+            if member_name:
+                f = tar.extractfile(tar.getmember(member_name))
+                if f:
+                    install_path.write_bytes(f.read())
+    elif asset_name.endswith(".zip"):
+        with zipfile.ZipFile(download_path) as zf:
+            binary_name = _find_binary_in_names(zf.namelist(), name)
+            if binary_name:
+                install_path.write_bytes(zf.read(binary_name))
+    else:
+        shutil.copy2(str(download_path), str(install_path))
+
+    install_path.chmod(0o755)
+    progress.update(task_id, description=f"✓ {name} installed to {install_path}.", completed=100)
+
+
+def _install_github_tool(progress: Progress, task_id: TaskID, tool: dict, temp_dir: str):
+    name = tool["name"]
+    repo_url = tool["repo"]
+    version = tool["version"]
+    script = tool.get("script")
+
+    progress.update(task_id, description=f"Installing {name}...", total=100, completed=0)
+
+    owner, repo = _parse_github_owner_repo(repo_url)
+
+    if version == GITHUB_LATEST:
+        progress.update(task_id, description=f"Fetching latest release for {name}...")
+        version = _fetch_latest_release_tag(owner, repo)
+
+    if script:
+        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{version}/{script}"
+        _install_script(progress, task_id, {"url": raw_url, "name": name}, temp_dir)
+    else:
+        _install_github_binary(progress, task_id, owner, repo, version, name, temp_dir)
+
+
+def install_github_tools(tools: list[dict], dry_run: bool = False) -> list:
+    """Install tools from GitHub releases (via install script or binary asset).
+
+    Args:
+        tools: List of tool dicts with keys: name, repo, version, script (optional).
+        dry_run: If True, only show what would be installed.
+
+    """
+    if not tools:
+        return []
+
+    if dry_run:
+        typer.echo("\n[GitHub tools - would be installed from GitHub releases]")
+        for tool in tools:
+            version_label = "latest release" if tool["version"] == GITHUB_LATEST else tool["version"]
+            method = f"script: {tool['script']}" if tool.get("script") else "binary asset"
+            typer.echo(f"  - {tool['name']} ({tool['repo']}, {version_label}, {method})")
+        return []
+
+    typer.secho("\n--- Installing GitHub Tools ---", fg=typer.colors.BLUE, bold=True)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        tasks = []
+        for tool in tools:
+            tasks.append({
+                "name": tool["name"],
+                "func": _install_github_tool,
+                "args": {"tool": tool, "temp_dir": temp_dir},
+            })
+        return run_tasks(tasks)
