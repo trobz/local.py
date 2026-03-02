@@ -5,10 +5,13 @@ from typing import Annotated
 import git
 import typer
 from rich import print as rprint
+from rich.console import Console
 from rich.progress import Progress, TaskID
+from rich.table import Table
 from rich.tree import Tree
 
 from .concurrency import TaskResult, run_tasks
+from .doctor import CheckStatus, run_doctor
 from .installers import (
     install_npm_packages,
     install_scripts,
@@ -558,3 +561,45 @@ def ensure_db_user(ctx: typer.Context):
     typer.secho(f"✓ PostgreSQL user '{username}' is ready for Odoo development", fg=typer.colors.GREEN)
     typer.echo()
     typer.secho("⚠️  WARNING: Using dev-only credentials (odoo:odoo). Never use in production!", fg=typer.colors.YELLOW)
+
+
+_STATUS_ICONS = {
+    CheckStatus.OK: "[green]OK[/green]",
+    CheckStatus.WARN: "[yellow]!![/yellow]",
+    CheckStatus.FAIL: "[red]FAIL[/red]",
+}
+
+
+@app.command()
+def doctor():
+    code_root = get_code_root()
+    groups = run_doctor(code_root)
+
+    console = Console()
+    has_fail = False
+    counts = {CheckStatus.OK: 0, CheckStatus.WARN: 0, CheckStatus.FAIL: 0}
+
+    for group_name, results in groups.items():
+        table = Table(title=group_name, show_header=True, title_style="bold cyan")
+        table.add_column("Status", width=6, justify="center")
+        table.add_column("Check", min_width=15)
+        table.add_column("Details")
+
+        for r in results:
+            counts[r.status] += 1
+            if r.status == CheckStatus.FAIL:
+                has_fail = True
+            table.add_row(_STATUS_ICONS[r.status], r.name, r.message)
+
+        console.print(table)
+        console.print()
+
+    summary = (
+        f"[green]{counts[CheckStatus.OK]} passed[/green], "
+        f"[yellow]{counts[CheckStatus.WARN]} warnings[/yellow], "
+        f"[red]{counts[CheckStatus.FAIL]} failures[/red]"
+    )
+    console.print(f"Summary: {summary}")
+
+    if has_fail:
+        raise typer.Exit(code=1)

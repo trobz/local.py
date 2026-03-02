@@ -4,11 +4,12 @@ Development guidelines, architectural patterns, and best practices for `trobz_lo
 
 ## Project Architecture
 
-Four-layer modular design with clear separation of concerns:
+Five-layer modular design with clear separation of concerns:
 
 | Layer | Module(s) | Responsibility |
 |---|---|---|
 | **CLI Layer** | `main.py` | Command routing, user interaction, newcomer mode |
+| **Diagnostics** | `doctor.py` | Environment health checks, status enums, check result dataclasses |
 | **Implementation** | `installers.py`, `postgres.py` | Installation strategies (script, system, npm, uv); PostgreSQL user management |
 | **Utility Layer** | `utils.py` | Config validation, platform detection, helpers |
 | **Infrastructure** | `concurrency.py`, `exceptions.py` | Parallel execution, custom exceptions |
@@ -57,7 +58,10 @@ System state defined in TOML. Tool reconciles local environment with definition.
 ### 4. Observer Pattern
 `GitProgress` and `run_tasks()`: Real-time progress callbacks to Rich UI. Decoupled from execution logic.
 
-### 5. Fail-Fast Validation
+### 5. Diagnostic Pattern
+`doctor.py`: Grouped health checks returning `CheckResult` objects with `CheckStatus` enum. Enables modular diagnostics that can be combined or reused independently.
+
+### 6. Fail-Fast Validation
 Config validated at startup. Early detection prevents side effects on invalid input.
 
 ---
@@ -171,14 +175,15 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ## File Structure
 
-**Target file size**: 500 LOC; main.py at 523 LOC is exception due to command density.
-- `main.py`: CLI commands and orchestration (523 LOC - consolidates 5 command implementations)
-- `installers.py`: Installation strategies (389 LOC - 5 installation strategies)
-- `postgres.py`: PostgreSQL user management (173 LOC)
-- `utils.py`: Config, platform detection, helpers (277 LOC)
-- `concurrency.py`: Task runner with progress (60 LOC)
-- `exceptions.py`: Custom exception classes (38 LOC)
-- `tests/`: pytest unit tests for all modules
+**Target file size**: 500 LOC; main.py at 592 LOC is exception due to command density (6 command implementations + orchestration).
+- `main.py`: CLI commands and orchestration (592 LOC - 6 commands: init, pull-repos, create-venvs, install-tools, ensure-db-user, doctor)
+- `doctor.py`: Environment health checks (~200 LOC - CheckStatus enum, CheckResult dataclass, check_* functions, run_doctor orchestrator)
+- `installers.py`: Installation strategies (391 LOC - 5 installation strategies: PostgreSQL repo, scripts, system packages, NPM, UV)
+- `postgres.py`: PostgreSQL user management (173 LOC - user validation, creation, testing)
+- `utils.py`: Config, platform detection, helpers (246 LOC - Pydantic models, OS detection, utilities)
+- `concurrency.py`: Task runner with progress (60 LOC - ThreadPoolExecutor wrapper, TaskResult dataclass)
+- `exceptions.py`: Custom exception classes (38 LOC - installer exceptions)
+- `tests/`: pytest unit tests for all modules (1006 LOC total - 6 test files)
 
 **Imports in each module**:
 - No circular imports

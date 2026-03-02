@@ -13,10 +13,12 @@ A developer tool for automating setup and management of local Odoo development e
 
 - **Environment Initialization** (`init`): Creates standardized directory structure (default: `~/code/`)
 - **Repository Management** (`pull-repos`): Clones/updates Odoo and OCA repos in parallel
-- **Tool Installation** (`install-tools`): Installs from four sources: scripts, system packages, NPM, and UV tools
+- **Tool Installation** (`install-tools`): Installs from five sources: PostgreSQL repo, scripts, system packages, NPM, and UV tools
 - **Virtual Environments** (`create-venvs`): Creates Odoo venvs for each configured version
+- **Database Setup** (`ensure-db-user`): Verifies/creates PostgreSQL user for development
+- **Health Checks** (`doctor`): Validates environment health (config, SSH, tools, venvs)
 - **Interactive Mode**: Newcomer mode with confirmations and guidance
-- **Security**: HTTPS enforcement for all downloads
+- **Security**: HTTPS enforcement, SQL injection prevention, subprocess safety
 - **Custom Directory**: Use `TLC_CODE_DIR` env var to override default `~/code` location
 
 ## Installation
@@ -74,6 +76,8 @@ tlc install-tools    # Install tools
 | `tlc pull-repos` | Clone or update Odoo/OCA repositories |
 | `tlc create-venvs` | Create Python virtual environments |
 | `tlc install-tools` | Install scripts, packages, and tools |
+| `tlc ensure-db-user` | Verify or create PostgreSQL user for development |
+| `tlc doctor` | Check environment health (config, SSH, tools, venvs) |
 
 Use `--newcomer=false` to skip confirmation prompts. Use `--help` on any command for options.
 

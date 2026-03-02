@@ -63,7 +63,7 @@ Clones or updates Odoo and OCA repositories:
 - **Operations**: Clone new repos, fetch and hard-reset existing ones
 
 ### 3. Tool Installation (`install-tools`)
-Five-stage installation pipeline:
+**Five-stage installation pipeline**:
 1. **PostgreSQL Repository** (Debian/Ubuntu only): Setup PGDG APT repository with GPG verification (idempotent)
 2. **Shell Scripts**: Download and execute scripts (e.g., uv installer)
 3. **System Packages**: OS-aware installation via apt/pacman/brew (runs after PostgreSQL repo setup on Debian/Ubuntu)
@@ -107,7 +107,7 @@ Verify or create PostgreSQL user for Odoo development:
 | **FR-1: Directory Structure** | Create `{CODE_ROOT}/` (default: `~/code/`) with `venvs/`, `oca/`, `odoo/`, `trobz/` subdirectories and version-specific folders |
 | **FR-2: Repository Operations** | Clone repos with `depth=1`, update via fetch+reset, support parallelization, allow name filtering |
 | **FR-3: Virtual Environments** | Create venvs for each Odoo version using `odoo-venv`, support parallel creation |
-| **FR-4: Tool Installation** | Four-stage pipeline: scripts → system packages → npm → uv tools; OS-aware package managers |
+| **FR-4: Tool Installation** | Five-stage pipeline: PostgreSQL repo → scripts → system packages → npm → uv tools; OS-aware package managers |
 | **FR-5: PostgreSQL User** | Verify/create PostgreSQL "odoo" user with CREATEDB permission; OS-aware execution (Linux sudo, macOS direct); connection validation |
 | **FR-6: Configuration** | TOML config at `{CODE_ROOT}/config.toml` (default: `~/code/config.toml`), strict Pydantic validation, clear error messages with examples |
 | **FR-7: User Interaction** | Interactive "newcomer mode", dry-run preview, rich console UI (progress bars, trees, colors) |
