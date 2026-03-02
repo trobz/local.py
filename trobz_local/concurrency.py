@@ -14,24 +14,31 @@ class TaskResult:
 
 def run_tasks(tasks, max_workers: int = 4):
     results = []
+    total = len(tasks)
+    completed_count = 0
+
     with Progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
     ) as progress:
+        overall = progress.add_task(f"[cyan]0/{total} done", total=total)
+
         future_to_task = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             try:
-                # submit tasks
+                # Submit tasks with hidden progress rows; reveal them on start
                 for task_info in tasks:
                     name = task_info["name"]
                     func = task_info["func"]
                     kwargs = task_info.get("args", {})
-                    task_id = progress.add_task(
-                        name,
-                        total=100,
-                    )
-                    future = executor.submit(func, progress, task_id, **kwargs)
+                    task_id = progress.add_task(name, total=100, visible=False)
+
+                    def _run(f=func, tid=task_id, kw=kwargs):
+                        progress.update(tid, visible=True)
+                        return f(progress, tid, **kw)
+
+                    future = executor.submit(_run)
                     future_to_task[future] = {"name": name, "task_id": task_id}
 
                 # Wait for all tasks to complete
@@ -42,7 +49,14 @@ def run_tasks(tasks, max_workers: int = 4):
 
                     try:
                         future.result()
-                        progress.update(task_id, completed=100)
+                        task = next(t for t in progress.tasks if t.id == task_id)
+                        label = task.description or name
+                        progress.update(task_id, completed=100, visible=False)
+                        completed_count += 1
+                        progress.update(
+                            overall, completed=completed_count, description=f"[cyan]{completed_count}/{total} done"
+                        )
+                        progress.console.print(label)
                         results.append(TaskResult(name=name, success=True, message="Completed"))
 
                     except Exception as e:
