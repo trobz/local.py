@@ -161,7 +161,7 @@ def test_get_tasks_generates_correct_list(mock_config, tmp_path):
         {
             "repo_name": "server-tools",
             "repo_path": code_root / "oca" / "16.0" / "server-tools",
-            "repo_url": "git@github.com:OCA/server-tools.git",
+            "repo_url": "git@github.com:oca/server-tools.git",
             "version": "16.0",
         },
         {
@@ -173,7 +173,7 @@ def test_get_tasks_generates_correct_list(mock_config, tmp_path):
         {
             "repo_name": "server-tools",
             "repo_path": code_root / "oca" / "17.0" / "server-tools",
-            "repo_url": "git@github.com:OCA/server-tools.git",
+            "repo_url": "git@github.com:oca/server-tools.git",
             "version": "17.0",
         },
     ]

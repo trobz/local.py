@@ -205,13 +205,16 @@ def _get_tasks(odoo_versions, repos_config, code_root, repo_filter):
                         "repo_url": ODOO_URLS[repo_name],
                         "version": str(version),
                     })
-        if "oca" in repos_config:
-            for repo_name in repos_config["oca"]:
+        # Generic GitHub orgs: any key other than "odoo"
+        for org, org_repos in repos_config.items():
+            if org == "odoo":
+                continue
+            for repo_name in org_repos:
                 if not repo_filter or repo_name in repo_filter:
                     tasks.append({
                         "repo_name": repo_name,
-                        "repo_path": code_root / "oca" / str(version) / repo_name,
-                        "repo_url": f"git@github.com:OCA/{repo_name}.git",
+                        "repo_path": code_root / org / str(version) / repo_name,
+                        "repo_url": f"git@github.com:{org}/{repo_name}.git",
                         "version": str(version),
                     })
     return tasks
