@@ -8,7 +8,7 @@ from pathlib import Path
 import git
 import tomli
 import typer
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from rich import print as rprint
 from rich.progress import (
     Progress,
@@ -79,17 +79,57 @@ class InvalidNpmPackageError(ValueError):
         super().__init__(f"Invalid npm package name: {pkg}")
 
 
-class RepoConfig(BaseModel):
-    odoo: list[str] = []
-    oca: list[str] = []
+class InvalidRepoOrgConfigError(TypeError):
+    def __init__(self, org: str):
+        super().__init__(f"[repos.{org}] must be a list")
 
-    @field_validator("*")
+
+class InvalidRepoEntryError(ValueError):
+    def __init__(self, org: str):
+        super().__init__(f"Invalid entry in [repos.{org}]: must be a name or [name, [branch, ...]]")
+
+
+_REPO_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]+$")
+
+
+def _validate_repo_entry(entry: object, org: str) -> None:
+    if isinstance(entry, str):
+        if not _REPO_NAME_RE.match(entry):
+            raise InvalidRepoNameError(entry)
+    elif (
+        isinstance(entry, list)
+        and len(entry) == 2
+        and isinstance(entry[0], str)
+        and isinstance(entry[1], list)
+        and all(isinstance(b, str) for b in entry[1])
+    ):
+        if not _REPO_NAME_RE.match(entry[0]):
+            raise InvalidRepoNameError(entry[0])
+    else:
+        raise InvalidRepoEntryError(org)
+
+
+class RepoConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    odoo: list[str] = []
+
+    @field_validator("odoo")
     @classmethod
-    def validate_repo_names(cls, v: list[str]):
+    def validate_odoo_repos(cls, v: list[str]) -> list[str]:
         for name in v:
-            if not re.match(r"^[a-zA-Z0-9._-]+$", name):
+            if not _REPO_NAME_RE.match(name):
                 raise InvalidRepoNameError(name)
         return v
+
+    @model_validator(mode="after")
+    def validate_orgs(self):
+        for org, repos in self.model_extra.items():
+            if not isinstance(repos, list):
+                raise InvalidRepoOrgConfigError(org)
+            for entry in repos:
+                _validate_repo_entry(entry, org)
+        return self
 
 
 class ScriptItem(BaseModel):

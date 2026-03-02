@@ -193,30 +193,43 @@ def pull_repos(  # noqa: C901
         typer.secho("\nAll repositories updated successfully.", fg=typer.colors.GREEN)
 
 
+def _iter_org_entries(org_repos, odoo_versions):
+    """Yield (repo_name, branch) pairs for an org's repo list.
+
+    Plain strings use all configured versions; [name, [branch, ...]] entries
+    use their explicit branch list.
+    """
+    for entry in org_repos:
+        if isinstance(entry, str):
+            for version in odoo_versions:
+                yield entry, str(version)
+        else:
+            for branch in entry[1]:
+                yield entry[0], str(branch)
+
+
 def _get_tasks(odoo_versions, repos_config, code_root, repo_filter):
     tasks = []
     for version in odoo_versions:
-        if "odoo" in repos_config:
-            for repo_name in repos_config["odoo"]:
-                if repo_name in ODOO_URLS and (not repo_filter or repo_name in repo_filter):
-                    tasks.append({
-                        "repo_name": repo_name,
-                        "repo_path": code_root / "odoo" / repo_name / version,
-                        "repo_url": ODOO_URLS[repo_name],
-                        "version": str(version),
-                    })
-        # Generic GitHub orgs: any key other than "odoo"
-        for org, org_repos in repos_config.items():
-            if org == "odoo":
-                continue
-            for repo_name in org_repos:
-                if not repo_filter or repo_name in repo_filter:
-                    tasks.append({
-                        "repo_name": repo_name,
-                        "repo_path": code_root / org / str(version) / repo_name,
-                        "repo_url": f"git@github.com:{org}/{repo_name}.git",
-                        "version": str(version),
-                    })
+        for repo_name in repos_config.get("odoo", []):
+            if repo_name in ODOO_URLS and (not repo_filter or repo_name in repo_filter):
+                tasks.append({
+                    "repo_name": repo_name,
+                    "repo_path": code_root / "odoo" / repo_name / version,
+                    "repo_url": ODOO_URLS[repo_name],
+                    "version": str(version),
+                })
+    for org, org_repos in repos_config.items():
+        if org == "odoo":
+            continue
+        for repo_name, branch in _iter_org_entries(org_repos, odoo_versions):
+            if not repo_filter or repo_name in repo_filter:
+                tasks.append({
+                    "repo_name": repo_name,
+                    "repo_path": code_root / org / branch / repo_name,
+                    "repo_url": f"git@github.com:{org}/{repo_name}.git",
+                    "version": branch,
+                })
     return tasks
 
 

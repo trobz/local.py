@@ -209,3 +209,31 @@ def test_get_tasks_with_filter(mock_config, tmp_path):
         task["repo_path"] = str(task["repo_path"])
 
     assert tasks == expected_tasks
+
+
+def test_get_tasks_inline_branch_override(mock_config, tmp_path):
+    odoo_versions = ["17.0", "18.0"]
+    repos_config = {
+        "oca": [
+            "server-tools",
+            ["oca-port", ["main"]],
+            ["oca-custom", ["17.0", "18.0"]],
+        ]
+    }
+    code_root = tmp_path / "code"
+
+    tasks = _get_tasks(odoo_versions, repos_config, code_root, None)
+
+    paths = {(t["repo_name"], t["version"]): t["repo_path"] for t in tasks}
+
+    # plain string → one task per configured version
+    assert (code_root / "oca" / "17.0" / "server-tools") == paths[("server-tools", "17.0")]
+    assert (code_root / "oca" / "18.0" / "server-tools") == paths[("server-tools", "18.0")]
+    # inline branch override → only the specified branches, no version loop
+    assert ("oca-port", "17.0") not in paths
+    assert ("oca-port", "18.0") not in paths
+    assert (code_root / "oca" / "main" / "oca-port") == paths[("oca-port", "main")]
+    # multiple explicit branches
+    assert (code_root / "oca" / "17.0" / "oca-custom") == paths[("oca-custom", "17.0")]
+    assert (code_root / "oca" / "18.0" / "oca-custom") == paths[("oca-custom", "18.0")]
+    assert len(tasks) == 5
