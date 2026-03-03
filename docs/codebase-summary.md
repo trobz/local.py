@@ -6,18 +6,18 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 | Metric | Value |
 |---|---|
-| **Version** | 0.2.0 |
+| **Version** | 0.6.0 |
 | **Language** | Python 3.10+ |
-| **Total LOC** | ~1,460 lines (core logic) + tests |
-| **Core Modules** | 7 files (main, installers, utils, postgres, concurrency, exceptions, \__init\_\_) |
-| **Test Modules** | tests/ directory with pytest unit tests |
+| **Total LOC** | 1,452 lines (core) + 982 lines (tests) |
+| **Core Modules** | 7 files (main.py 544, installers.py 391, utils.py 246, postgres.py 173, concurrency.py 60, exceptions.py 38, \__init\_\_.py) |
+| **Test Modules** | 5 test files with pytest, 982 total LOC |
 | **Primary Frameworks** | Typer (CLI), Pydantic (validation), Rich (UI), GitPython (git) |
 | **Concurrency Model** | ThreadPoolExecutor, max 4 workers, I/O-bound tasks |
 | **License** | AGPL-3.0 |
 
 ## Module Breakdown
 
-### `main.py` (523 LOC)
+### `main.py` (544 LOC)
 **Purpose**: CLI entry point and command orchestration
 
 **Responsibilities**:
@@ -45,7 +45,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `installers.py` (389 LOC)
+### `installers.py` (391 LOC)
 **Purpose**: Multi-source tool installation strategies
 
 **Strategies**:
@@ -70,7 +70,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `utils.py` (277 LOC)
+### `utils.py` (246 LOC)
 **Purpose**: Configuration validation, platform detection, utilities
 
 **Pydantic Models**:
@@ -98,7 +98,7 @@ Technical overview of the `trobz_local` codebase structure, implementation patte
 
 ---
 
-### `concurrency.py` (61 LOC)
+### `concurrency.py` (60 LOC)
 **Purpose**: Generic parallel task execution with progress tracking
 
 **TaskResult Dataclass**:
@@ -120,7 +120,7 @@ class TaskResult:
 
 ---
 
-### `exceptions.py` (39 LOC)
+### `exceptions.py` (38 LOC)
 **Purpose**: Custom exception hierarchy for granular error handling
 
 **Exception Classes**:

@@ -165,10 +165,10 @@ install-tools command
     ├─ Show confirmation (newcomer mode)
     │   └─ If --dry-run: show preview, exit 0
     │
-    ├─ Execute five installers in sequence:
+    ├─ Execute five-stage installation pipeline in sequence:
     │   1. setup_postgresql_repo() [Debian/Ubuntu only, idempotent]
     │       ├─ Check if PGDG repo already configured
-    │       ├─ If missing, add PGDG APT repository
+    │       ├─ If missing, add PGDG APT repository with GPG verification
     │       ├─ Download and verify GPG key
     │       └─ Update apt sources
     │
@@ -257,6 +257,47 @@ ensure-db-user command
 
 ---
 
+### `tlc doctor` Flow
+```
+doctor command
+    │
+    ├─ Load config.toml
+    │
+    └─ Run health checks grouped by category:
+        │
+        ├─ Configuration
+        │   └─ check_config()
+        │       ├─ Verify config.toml exists
+        │       ├─ Parse and validate TOML syntax
+        │       └─ Return CheckResult(status: OK|WARN|FAIL, message)
+        │
+        ├─ Connectivity
+        │   └─ check_github_ssh()
+        │       ├─ Test SSH connection to git@github.com
+        │       └─ Return CheckResult(status: OK|WARN|FAIL)
+        │
+        ├─ Tools
+        │   └─ check_tool_versions()
+        │       ├─ _check_uv_tools() - query uv tool list
+        │       ├─ _check_npm_packages() - query npm list -g --json
+        │       └─ Return list[CheckResult] per tool
+        │
+        └─ Virtual Environments
+            └─ list_venvs()
+                ├─ For each configured version in config
+                ├─ Check venvs/{version}/bin/python exists
+                ├─ Run python --version to verify functionality
+                └─ Return list[CheckResult] per version
+    │
+    └─ Format results:
+        ├─ Create Rich table per group (Configuration, Connectivity, Tools, Venvs)
+        ├─ Map CheckStatus → icon (OK=green, WARN=yellow, FAIL=red)
+        ├─ Display summary counts (passed, warnings, failures)
+        └─ Exit 1 if any FAIL, else exit 0
+```
+
+---
+
 ## Component Interaction Details
 
 ### Configuration Pipeline
@@ -333,6 +374,12 @@ func(progress: Progress, task_id: TaskID, **args)
 ```
 install_tools request
         │
+        ├─ PostgreSQL Repository (Debian/Ubuntu only)
+        │   ├─ Check if PGDG repo already configured
+        │   ├─ If missing, add PGDG APT repository
+        │   ├─ Download and verify GPG key
+        │   └─ Update apt sources (idempotent)
+        │
         ├─ Scripts
         │   ├─ Create temp directory
         │   ├─ For each URL:
@@ -344,7 +391,7 @@ install_tools request
         │   │       └─ Run with /bin/sh (safe)
         │   └─ Auto-cleanup temp directory
         │
-        ├─ System Packages
+        ├─ System Packages (runs after PostgreSQL repo on Debian/Ubuntu)
         │   ├─ _get_package_manager_config(os, distro)
         │   │   ├─ Arch → pacman -S --noconfirm --needed
         │   │   ├─ Ubuntu → apt-get install -y
@@ -466,6 +513,24 @@ Rich Progress Bar (one per task)
 ---
 
 ## Data Structures
+
+### CheckResult (doctor module)
+```python
+@dataclass
+class CheckResult:
+    name: str              # Check identifier ("Config file", "GitHub SSH", etc.)
+    status: CheckStatus    # Enum: OK | WARN | FAIL
+    message: str           # Status message ("Valid — 3 version(s) defined")
+    detail: str = ""       # Additional error details (exception trace, etc.)
+```
+
+### CheckStatus (doctor module)
+```python
+class CheckStatus(Enum):
+    OK = "OK"       # Check passed
+    WARN = "WARN"   # Check passed with warnings (missing optional tool)
+    FAIL = "FAIL"   # Check failed (invalid config, auth error)
+```
 
 ### TaskResult
 ```python

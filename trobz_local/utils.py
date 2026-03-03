@@ -8,7 +8,7 @@ from pathlib import Path
 import git
 import tomli
 import typer
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from rich import print as rprint
 from rich.progress import (
     Progress,
@@ -19,15 +19,30 @@ TOOL_NAME_REGEX = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$")
 VERSION_REGEX = re.compile(r"^(?:\d+\.\d+|master)$")
 
 ARCH_PACKAGES = [
-    "gcc",
-    "postgresql",
-    "postgresql-libs",
-    "libxml2",
-    "libxslt",
-    "libjpeg",
-    "libsass",
-    "base-devel",
     "git",
+    "gcc",
+    "cyrus-sasl",
+    "libldap",
+    "openssl",  # cryptography
+    "libffi",  # cairosvg
+    "libxml2",  # lxml, pysaml2
+    "libxslt",  # lxml
+    "libjpeg-turbo",
+    "postgresql-libs",
+    "libsass",
+    "cracklib",
+    "geos",  # shapely
+    "xmlsec",  # pysaml2
+    "zbar",  # pyzbar
+    "cairo",  # cairosvg
+    "cups",  # pycups
+    "fontconfig",
+    "graphviz",
+    "ghostscript",
+    "gsfonts",
+    "poppler",  # pdf2image
+    "postgresql",
+    "base-devel",
 ]
 
 UBUNTU_PACKAGES = [
@@ -35,13 +50,27 @@ UBUNTU_PACKAGES = [
     "gcc",
     "libsasl2-dev",
     "libldap2-dev",
-    "libssl-dev",
-    "libffi-dev",
-    "libxml2-dev",
-    "libxslt1-dev",
+    "libssl-dev",  # cryptography
+    "libffi-dev",  # cairosvg
+    "libxml2-dev",  # lxml, pysaml2
+    "libxslt1-dev",  # lxml
     "libjpeg-dev",
     "libpq-dev",
     "libsass-dev",
+    "libcrack2-dev",
+    "libgeos-dev",  # shapely
+    "libxmlsec1-dev",  # pysaml2
+    "libxmlsec1-openssl",  # pysaml2
+    "libzbar0",  # pyzbar
+    "libzbar-dev",  # pyzbar
+    "libcairo2",  # cairosvg
+    "libcups2-dev",  # pycups
+    "fontconfig",
+    "fontconfig-config",
+    "graphviz",
+    "ghostscript",
+    "gsfonts",
+    "poppler-utils",  # pdf2image
     "postgresql",
     "postgresql-client",
     "postgresql-contrib",
@@ -79,17 +108,57 @@ class InvalidNpmPackageError(ValueError):
         super().__init__(f"Invalid npm package name: {pkg}")
 
 
-class RepoConfig(BaseModel):
-    odoo: list[str] = []
-    oca: list[str] = []
+class InvalidRepoOrgConfigError(TypeError):
+    def __init__(self, org: str):
+        super().__init__(f"[repos.{org}] must be a list")
 
-    @field_validator("*")
+
+class InvalidRepoEntryError(ValueError):
+    def __init__(self, org: str):
+        super().__init__(f"Invalid entry in [repos.{org}]: must be a name or [name, [branch, ...]]")
+
+
+_REPO_NAME_RE = re.compile(r"^[a-zA-Z0-9._-]+$")
+
+
+def _validate_repo_entry(entry: object, org: str) -> None:
+    if isinstance(entry, str):
+        if not _REPO_NAME_RE.match(entry):
+            raise InvalidRepoNameError(entry)
+    elif (
+        isinstance(entry, list)
+        and len(entry) == 2
+        and isinstance(entry[0], str)
+        and isinstance(entry[1], list)
+        and all(isinstance(b, str) for b in entry[1])
+    ):
+        if not _REPO_NAME_RE.match(entry[0]):
+            raise InvalidRepoNameError(entry[0])
+    else:
+        raise InvalidRepoEntryError(org)
+
+
+class RepoConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    odoo: list[str] = []
+
+    @field_validator("odoo")
     @classmethod
-    def validate_repo_names(cls, v: list[str]):
+    def validate_odoo_repos(cls, v: list[str]) -> list[str]:
         for name in v:
-            if not re.match(r"^[a-zA-Z0-9._-]+$", name):
+            if not _REPO_NAME_RE.match(name):
                 raise InvalidRepoNameError(name)
         return v
+
+    @model_validator(mode="after")
+    def validate_orgs(self):
+        for org, repos in self.model_extra.items():
+            if not isinstance(repos, list):
+                raise InvalidRepoOrgConfigError(org)
+            for entry in repos:
+                _validate_repo_entry(entry, org)
+        return self
 
 
 class ScriptItem(BaseModel):
