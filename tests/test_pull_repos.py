@@ -5,8 +5,8 @@ import pytest
 from rich.progress import Progress, TaskID
 from typer.testing import CliRunner
 
-from trobz_local.main import ODOO_URLS, _get_tasks, _pull_repo
-from trobz_local.utils import get_config
+from trobz_local.main import _pull_repo
+from trobz_local.utils import ODOO_URLS, get_config, get_repo_tasks
 
 runner = CliRunner()
 
@@ -149,7 +149,7 @@ def test_get_tasks_generates_correct_list(mock_config, tmp_path):
     repos_config = {"odoo": ["odoo"], "oca": ["server-tools"]}
     code_root = tmp_path / "code"
 
-    tasks = _get_tasks(odoo_versions, repos_config, code_root, None)
+    tasks = get_repo_tasks(odoo_versions, repos_config, code_root, None)
 
     expected_tasks = [
         {
@@ -193,7 +193,7 @@ def test_get_tasks_with_filter(mock_config, tmp_path):
     repos_config = {"odoo": ["odoo"], "oca": ["server-tools"]}
     code_root = tmp_path / "code"
 
-    tasks = _get_tasks(odoo_versions, repos_config, code_root, repo_filter=["odoo"])
+    tasks = get_repo_tasks(odoo_versions, repos_config, code_root, repo_filter=["odoo"])
 
     expected_tasks = [
         {
@@ -222,7 +222,7 @@ def test_get_tasks_inline_branch_override(mock_config, tmp_path):
     }
     code_root = tmp_path / "code"
 
-    tasks = _get_tasks(odoo_versions, repos_config, code_root, None)
+    tasks = get_repo_tasks(odoo_versions, repos_config, code_root, None)
 
     paths = {(t["repo_name"], t["version"]): t["repo_path"] for t in tasks}
 
