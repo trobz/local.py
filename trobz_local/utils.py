@@ -19,15 +19,30 @@ TOOL_NAME_REGEX = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._\-\[\]@=<>!,]*$")
 VERSION_REGEX = re.compile(r"^(?:\d+\.\d+|master)$")
 
 ARCH_PACKAGES = [
-    "gcc",
-    "postgresql",
-    "postgresql-libs",
-    "libxml2",
-    "libxslt",
-    "libjpeg",
-    "libsass",
-    "base-devel",
     "git",
+    "gcc",
+    "cyrus-sasl",
+    "libldap",
+    "openssl",  # cryptography
+    "libffi",  # cairosvg
+    "libxml2",  # lxml, pysaml2
+    "libxslt",  # lxml
+    "libjpeg-turbo",
+    "postgresql-libs",
+    "libsass",
+    "cracklib",
+    "geos",  # shapely
+    "xmlsec",  # pysaml2
+    "zbar",  # pyzbar
+    "cairo",  # cairosvg
+    "cups",  # pycups
+    "fontconfig",
+    "graphviz",
+    "ghostscript",
+    "gsfonts",
+    "poppler",  # pdf2image
+    "postgresql",
+    "base-devel",
 ]
 
 UBUNTU_PACKAGES = [
@@ -35,13 +50,27 @@ UBUNTU_PACKAGES = [
     "gcc",
     "libsasl2-dev",
     "libldap2-dev",
-    "libssl-dev",
-    "libffi-dev",
-    "libxml2-dev",
-    "libxslt1-dev",
+    "libssl-dev",  # cryptography
+    "libffi-dev",  # cairosvg
+    "libxml2-dev",  # lxml, pysaml2
+    "libxslt1-dev",  # lxml
     "libjpeg-dev",
     "libpq-dev",
     "libsass-dev",
+    "libcrack2-dev",
+    "libgeos-dev",  # shapely
+    "libxmlsec1-dev",  # pysaml2
+    "libxmlsec1-openssl",  # pysaml2
+    "libzbar0",  # pyzbar
+    "libzbar-dev",  # pyzbar
+    "libcairo2",  # cairosvg
+    "libcups2-dev",  # pycups
+    "fontconfig",
+    "fontconfig-config",
+    "graphviz",
+    "ghostscript",
+    "gsfonts",
+    "poppler-utils",  # pdf2image
     "postgresql",
     "postgresql-client",
     "postgresql-contrib",

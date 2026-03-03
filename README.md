@@ -111,6 +111,10 @@ The config file will be created at `{TLC_CODE_DIR}/config.toml`.
 
 See [Configuration Schema](./docs/project-overview-pdr.md#configuration-schema) for all options and validation rules.
 
+## System Packages
+
+When `install-tools` installs system packages, it uses a curated list that goes beyond what Odoo itself requires. The goal is to pre-install all system-level dependencies needed to compile and run any OCA module out of the box — things like `libcups2-dev` (for `pycups`), `libgeos-dev` (for `shapely`), `libxmlsec1-dev` (for `pysaml2`), `libzbar-dev` (for `pyzbar`), and more. This avoids compilation errors when installing OCA module requirements, without needing to know in advance which modules will be used.
+
 ## System Requirements
 
 - Python 3.10+
