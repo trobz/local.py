@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 from typing import Annotated
@@ -32,6 +33,7 @@ from .utils import (
     get_config,
     get_os_info,
     get_uv_path,
+    show_config_instructions,
 )
 
 app = typer.Typer()
@@ -69,6 +71,26 @@ def main(
 @app.command()
 def init(ctx: typer.Context):
     _run_init(ctx)
+
+
+@app.command()
+def edit_config():
+    config_path = get_code_root() / "config.toml"
+
+    if not config_path.exists():
+        show_config_instructions()
+        raise typer.Exit(code=1)
+
+    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR", "vi")
+    typer.echo(f"Opening {config_path} with {editor}...")
+    try:
+        subprocess.run([editor, str(config_path)], check=True)  # noqa: S603
+    except FileNotFoundError:
+        typer.secho(f"Editor '{editor}' not found. Set $EDITOR or $VISUAL.", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from None
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Editor exited with error: {e.returncode}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from None
 
 
 def _run_init(ctx: typer.Context):
