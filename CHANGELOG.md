@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-03-03)
+
+### Bug Fixes
+
+- Hide completed progress tasks to avoid terminal overflow
+  ([`ecad576`](https://github.com/trobz/local.py/commit/ecad576033efe3aacbfc26eaca1a1268ab396bd6))
+
+### Features
+
+- Support generic GitHub orgs and per-repo branch override in config
+  ([`f256125`](https://github.com/trobz/local.py/commit/f25612550c503a0297aa226f4210c77829792cd2))
+
+- **doctor**: Add health check command for environment diagnostics
+  ([`dba5a1d`](https://github.com/trobz/local.py/commit/dba5a1d81fd33a492b8638fd6de193776b36824d))
+
+### Refactoring
+
+- Generalize _get_tasks to handle any GitHub org
+  ([`b47b2fa`](https://github.com/trobz/local.py/commit/b47b2fae4d0b385704d0a1b0b47aca94e8cb5e42))
+
+
 ## v0.6.0 (2026-02-26)
 
 ### Features
