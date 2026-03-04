@@ -8,6 +8,7 @@ from trobz_local.doctor import (
     CheckStatus,
     check_config,
     check_github_ssh,
+    check_repos,
     check_system_tools,
     check_tool_versions,
     list_venvs,
@@ -27,7 +28,7 @@ def test_check_config_valid(tmp_path):
     (tmp_path / "config.toml").write_text('versions = ["18.0"]\n\n[repos]\nodoo = ["odoo"]\n')
     result = check_config(tmp_path)
     assert result.status == CheckStatus.OK
-    assert "1 version" in result.message
+    assert "Valid" in result.message
 
 
 def test_check_config_missing(tmp_path):
@@ -247,16 +248,18 @@ def test_list_venvs_empty_versions(tmp_path):
 # ---------------------------------------------------------------------------
 
 
+@patch("trobz_local.doctor.check_repos")
 @patch("trobz_local.doctor.check_github_ssh")
 @patch("trobz_local.doctor.check_system_tools")
 @patch("trobz_local.doctor.check_tool_versions")
 @patch("trobz_local.doctor.list_venvs")
-def test_run_doctor_with_config(mock_venvs, mock_tools, mock_sys_tools, mock_ssh, tmp_path):
+def test_run_doctor_with_config(mock_venvs, mock_tools, mock_sys_tools, mock_ssh, mock_repos, tmp_path):
     (tmp_path / "config.toml").write_text('versions = ["18.0"]\n')
     mock_ssh.return_value = CheckResult("GitHub SSH", CheckStatus.OK, "Authenticated")
     mock_sys_tools.return_value = [CheckResult("git", CheckStatus.OK, "Found (git version 2.45.0)")]
     mock_tools.return_value = []
     mock_venvs.return_value = []
+    mock_repos.return_value = [CheckResult("odoo (18.0)", CheckStatus.OK, "up to date")]
 
     groups = run_doctor(tmp_path)
 
@@ -264,6 +267,7 @@ def test_run_doctor_with_config(mock_venvs, mock_tools, mock_sys_tools, mock_ssh
     assert "Connectivity" in groups
     assert "Tools" in groups
     assert "Virtual Environments" in groups
+    assert "Repositories" in groups
     assert groups["Configuration"][0].status == CheckStatus.OK
     # System tools always included
     assert groups["Tools"][0].name == "git"
@@ -324,3 +328,130 @@ def test_doctor_command_warnings_exit_zero(mock_root, mock_doctor, tmp_path):
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
     assert "!!" in result.output
+
+
+# ---------------------------------------------------------------------------
+# check_repos
+# ---------------------------------------------------------------------------
+
+
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_not_cloned(mock_tasks, tmp_path):
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": tmp_path / "nonexistent", "version": "18.0"},
+    ]
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert len(results) == 1
+    assert results[0].status == CheckStatus.FAIL
+    assert "not cloned" in results[0].message
+
+
+@patch("trobz_local.doctor.git.Repo")
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_up_to_date(mock_tasks, mock_repo_cls, tmp_path):
+    repo_path = tmp_path / "odoo"
+    repo_path.mkdir()
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": repo_path, "version": "18.0"},
+    ]
+    mock_repo = MagicMock()
+    mock_repo.head.commit.hexsha = "abc123"
+    mock_repo.remotes.origin.refs.__getitem__.return_value.commit.hexsha = "abc123"
+    mock_repo.is_dirty.return_value = False
+    mock_repo_cls.return_value = mock_repo
+
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert results[0].status == CheckStatus.OK
+    assert "up to date" in results[0].message
+
+
+@patch("trobz_local.doctor.git.Repo")
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_behind(mock_tasks, mock_repo_cls, tmp_path):
+    repo_path = tmp_path / "odoo"
+    repo_path.mkdir()
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": repo_path, "version": "18.0"},
+    ]
+    mock_repo = MagicMock()
+    mock_repo.head.commit.hexsha = "abc123"
+    mock_repo.remotes.origin.refs.__getitem__.return_value.commit.hexsha = "def456"
+    mock_repo.is_dirty.return_value = False
+    mock_repo_cls.return_value = mock_repo
+
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert results[0].status == CheckStatus.WARN
+    assert "behind upstream" in results[0].message
+
+
+@patch("trobz_local.doctor.git.Repo")
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_dirty(mock_tasks, mock_repo_cls, tmp_path):
+    repo_path = tmp_path / "odoo"
+    repo_path.mkdir()
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": repo_path, "version": "18.0"},
+    ]
+    mock_repo = MagicMock()
+    mock_repo.head.commit.hexsha = "abc123"
+    mock_repo.remotes.origin.refs.__getitem__.return_value.commit.hexsha = "abc123"
+    mock_repo.is_dirty.return_value = True
+    mock_repo_cls.return_value = mock_repo
+
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert results[0].status == CheckStatus.WARN
+    assert "dirty" in results[0].message
+
+
+@patch("trobz_local.doctor.git.Repo")
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_behind_and_dirty(mock_tasks, mock_repo_cls, tmp_path):
+    repo_path = tmp_path / "odoo"
+    repo_path.mkdir()
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": repo_path, "version": "18.0"},
+    ]
+    mock_repo = MagicMock()
+    mock_repo.head.commit.hexsha = "abc123"
+    mock_repo.remotes.origin.refs.__getitem__.return_value.commit.hexsha = "def456"
+    mock_repo.is_dirty.return_value = True
+    mock_repo_cls.return_value = mock_repo
+
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert results[0].status == CheckStatus.WARN
+    assert "behind upstream" in results[0].message
+    assert "dirty" in results[0].message
+
+
+@patch("trobz_local.doctor.git.Repo")
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_fetch_error(mock_tasks, mock_repo_cls, tmp_path):
+    repo_path = tmp_path / "odoo"
+    repo_path.mkdir()
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": repo_path, "version": "18.0"},
+    ]
+    mock_repo = MagicMock()
+    mock_repo.remotes.origin.fetch.side_effect = Exception("network error")
+    mock_repo_cls.return_value = mock_repo
+
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert results[0].status == CheckStatus.WARN
+    assert "fetch failed" in results[0].message
+
+
+@patch("trobz_local.doctor.git.Repo")
+@patch("trobz_local.doctor.get_repo_tasks")
+def test_check_repos_invalid_repo(mock_tasks, mock_repo_cls, tmp_path):
+    import git as git_mod
+
+    repo_path = tmp_path / "odoo"
+    repo_path.mkdir()
+    mock_tasks.return_value = [
+        {"repo_name": "odoo", "repo_path": repo_path, "version": "18.0"},
+    ]
+    mock_repo_cls.side_effect = git_mod.exc.InvalidGitRepositoryError("bad")
+
+    results = check_repos(tmp_path, {}, ["18.0"])
+    assert results[0].status == CheckStatus.FAIL
+    assert "invalid git repository" in results[0].message

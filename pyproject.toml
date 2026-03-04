@@ -19,7 +19,7 @@ dependencies = [
 Repository = "https://github.com/trobz/trobz_local"
 
 [project.scripts]
-tlc = "trobz_local.main:app"
+tlc = "trobz_local.main:cli"
 
 [dependency-groups]
 dev = [

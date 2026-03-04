@@ -216,6 +216,52 @@ class ConfigModel(BaseModel):
         return v
 
 
+ODOO_URLS = {
+    "odoo": "git@github.com:odoo/odoo.git",
+    "enterprise": "git@github.com:odoo/enterprise.git",
+}
+
+
+def iter_org_entries(org_repos, odoo_versions):
+    """Yield (repo_name, branch) pairs for an org's repo list.
+
+    Plain strings use all configured versions; [name, [branch, ...]] entries
+    use their explicit branch list.
+    """
+    for entry in org_repos:
+        if isinstance(entry, str):
+            for version in odoo_versions:
+                yield entry, str(version)
+        else:
+            for branch in entry[1]:
+                yield entry[0], str(branch)
+
+
+def get_repo_tasks(odoo_versions, repos_config, code_root, repo_filter):
+    tasks = []
+    for version in odoo_versions:
+        for repo_name in repos_config.get("odoo", []):
+            if repo_name in ODOO_URLS and (not repo_filter or repo_name in repo_filter):
+                tasks.append({
+                    "repo_name": repo_name,
+                    "repo_path": code_root / "odoo" / repo_name / version,
+                    "repo_url": ODOO_URLS[repo_name],
+                    "version": str(version),
+                })
+    for org, org_repos in repos_config.items():
+        if org == "odoo":
+            continue
+        for repo_name, branch in iter_org_entries(org_repos, odoo_versions):
+            if not repo_filter or repo_name in repo_filter:
+                tasks.append({
+                    "repo_name": repo_name,
+                    "repo_path": code_root / org / branch / repo_name,
+                    "repo_url": f"git@github.com:{org}/{repo_name}.git",
+                    "version": branch,
+                })
+    return tasks
+
+
 def get_code_root() -> Path:
     """Get the code root directory from TLC_CODE_DIR env var or default to ~/code."""
     env_code_dir = os.environ.get("TLC_CODE_DIR")
@@ -227,14 +273,14 @@ def get_code_root() -> Path:
 def get_uv_path():
     uv_path = shutil.which("uv")
     if not uv_path:
-        typer.secho("Error: uv is not installed. Please install uv first.", fg=typer.colors.RED)
+        typer.secho("Error: uv is not installed. Please install uv first.", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
     return uv_path
 
 
 def show_config_instructions():
     content = files("trobz_local").joinpath("assets/odoo_dev.toml").read_text()
-    typer.secho("Config file not found.", fg=typer.colors.YELLOW)
+    typer.secho("Config file not found.", fg=typer.colors.YELLOW, err=True)
     code_root = get_code_root()
     typer.echo(f"Please create {code_root}/config.toml with content like this:")
     typer.echo(content)
@@ -256,7 +302,7 @@ def get_config():
         with open(config_path, "rb") as f:
             raw_config = tomli.load(f)
     except tomli.TOMLDecodeError as e:
-        typer.secho(f"Error: Invalid TOML in {config_path}", fg=typer.colors.RED)
+        typer.secho(f"Error: Invalid TOML in {config_path}", fg=typer.colors.RED, err=True)
         typer.echo(str(e))
         raise typer.Exit(code=1) from e
 
@@ -264,7 +310,7 @@ def get_config():
         validated_config = ConfigModel(**raw_config)
     except ValidationError as e:
         for error in e.errors():
-            typer.secho(f"{error['msg']}", fg=typer.colors.RED)
+            typer.secho(f"{error['msg']}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
 
     return validated_config.model_dump()
@@ -293,7 +339,7 @@ def confirm_step(ctx: typer.Context, message: str, command: str):
     If in newcomer mode, prints a help message and asks for confirmation to proceed.
     """
     if ctx.obj.get("newcomer", False):
-        typer.secho(f"About to run: {command}", fg=typer.colors.BLUE)
+        typer.secho(f"About to run: {command}", fg=typer.colors.BLUE, err=True)
         rprint(message)
         if not typer.confirm("Do you want to proceed?"):
             raise typer.Abort()

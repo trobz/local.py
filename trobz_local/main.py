@@ -1,7 +1,10 @@
+import os
 import subprocess
+import traceback
 from pathlib import Path
 from typing import Annotated
 
+import click
 import git
 import typer
 from rich import print as rprint
@@ -31,37 +34,76 @@ from .utils import (
     get_code_root,
     get_config,
     get_os_info,
+    get_repo_tasks,
     get_uv_path,
+    show_config_instructions,
 )
 
-app = typer.Typer()
+app = typer.Typer(
+    rich_markup_mode="rich",
+    epilog="Docs & issues: https://github.com/trobz/trobz_local",
+)
 
-ODOO_URLS = {
-    "odoo": "git@github.com:odoo/odoo.git",
-    "enterprise": "git@github.com:odoo/enterprise.git",
-}
+
+def _version_callback(value: bool) -> None:
+    if value:
+        from importlib.metadata import version
+
+        typer.echo(f"tlc {version('trobz_local')}")
+        raise typer.Exit()
 
 
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    newcomer: bool = typer.Option(
-        True,
-        help="Enable newcomer mode with confirmations and help.",
-        envvar="NEWCOMER_MODE",
-    ),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        "-y",
-        help="Skip all confirmations (non-interactive mode).",
-    ),
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show version and exit.",
+        ),
+    ] = False,
+    newcomer: Annotated[
+        bool,
+        typer.Option(
+            help="Enable newcomer mode with confirmations and help.",
+            envvar="NEWCOMER_MODE",
+        ),
+    ] = True,
+    yes: Annotated[
+        bool,
+        typer.Option(
+            "--yes",
+            "-y",
+            help="Skip all confirmations (non-interactive mode).",
+        ),
+    ] = False,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help="Show full stack traces on error.",
+        ),
+    ] = False,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+            "--quiet",
+            "-q",
+            help="Suppress informational output.",
+        ),
+    ] = False,
 ):
     """
     Hi, I'm a CLI to help you setup and manage your local environment for Odoo development.
     """
     ctx.ensure_object(dict)
     ctx.obj["newcomer"] = newcomer and not yes
+    ctx.obj["debug"] = debug
+    ctx.obj["quiet"] = quiet
     if ctx.invoked_subcommand is None:
         _run_init(ctx)
 
@@ -69,6 +111,26 @@ def main(
 @app.command()
 def init(ctx: typer.Context):
     _run_init(ctx)
+
+
+@app.command()
+def edit_config():
+    config_path = get_code_root() / "config.toml"
+
+    if not config_path.exists():
+        show_config_instructions()
+        raise typer.Exit(code=1)
+
+    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR", "vi")
+    typer.echo(f"Opening {config_path} with {editor}...")
+    try:
+        subprocess.run([editor, str(config_path)], check=True)  # noqa: S603
+    except FileNotFoundError:
+        typer.secho(f"Editor '{editor}' not found. Set $EDITOR or $VISUAL.", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from None
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Editor exited with error: {e.returncode}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from None
 
 
 def _run_init(ctx: typer.Context):
@@ -94,7 +156,7 @@ def _run_init(ctx: typer.Context):
 
     odoo_versions = config.get("versions")
     if not odoo_versions:
-        typer.echo("versions not found in config file.")
+        typer.echo("versions not found in config file.", err=True)
         raise typer.Exit(code=1)
 
     for version in odoo_versions:
@@ -143,7 +205,7 @@ def pull_repos(  # noqa: C901
     repos_config = config.get("repos", {})
     code_root = get_code_root()
 
-    repo_infos_for_tasks = _get_tasks(odoo_versions, repos_config, code_root, repo_filter)
+    repo_infos_for_tasks = get_repo_tasks(odoo_versions, repos_config, code_root, repo_filter)
 
     if not repo_infos_for_tasks:
         return
@@ -188,52 +250,12 @@ def pull_repos(  # noqa: C901
     results = run_tasks(concurrency_tasks)
     failed_tasks = [res for res in results if not res.success]
     if failed_tasks:
-        typer.secho("\n--- Some repository operations failed ---", fg=typer.colors.RED)
+        typer.secho("\n--- Some repository operations failed ---", fg=typer.colors.RED, err=True)
         for res in failed_tasks:
-            typer.secho(f"✗ {res.name}: {res.message}", fg=typer.colors.RED)
+            typer.secho(f"✗ {res.name}: {res.message}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
     else:
         typer.secho("\nAll repositories updated successfully.", fg=typer.colors.GREEN)
-
-
-def _iter_org_entries(org_repos, odoo_versions):
-    """Yield (repo_name, branch) pairs for an org's repo list.
-
-    Plain strings use all configured versions; [name, [branch, ...]] entries
-    use their explicit branch list.
-    """
-    for entry in org_repos:
-        if isinstance(entry, str):
-            for version in odoo_versions:
-                yield entry, str(version)
-        else:
-            for branch in entry[1]:
-                yield entry[0], str(branch)
-
-
-def _get_tasks(odoo_versions, repos_config, code_root, repo_filter):
-    tasks = []
-    for version in odoo_versions:
-        for repo_name in repos_config.get("odoo", []):
-            if repo_name in ODOO_URLS and (not repo_filter or repo_name in repo_filter):
-                tasks.append({
-                    "repo_name": repo_name,
-                    "repo_path": code_root / "odoo" / repo_name / version,
-                    "repo_url": ODOO_URLS[repo_name],
-                    "version": str(version),
-                })
-    for org, org_repos in repos_config.items():
-        if org == "odoo":
-            continue
-        for repo_name, branch in _iter_org_entries(org_repos, odoo_versions):
-            if not repo_filter or repo_name in repo_filter:
-                tasks.append({
-                    "repo_name": repo_name,
-                    "repo_path": code_root / org / branch / repo_name,
-                    "repo_url": f"git@github.com:{org}/{repo_name}.git",
-                    "version": branch,
-                })
-    return tasks
 
 
 def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict):
@@ -356,7 +378,9 @@ def _run_installers(
 def install_tools(
     ctx: typer.Context,
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed without executing."),
-    install_default_system_packages: bool = typer.Option(True, help="Install default OS system packages."),
+    no_default_packages: Annotated[
+        bool, typer.Option("--no-default-packages", help="Skip default OS system packages.")
+    ] = False,
 ):
     """
     Install tools using uv tool based on config.
@@ -379,14 +403,16 @@ def install_tools(
     msg = _build_install_message(tools_config)
     confirm_step(ctx, msg, "install-tools")
 
-    all_results, any_failed = _run_installers(tools_config, dry_run, install_default_system_packages)
+    all_results, any_failed = _run_installers(
+        tools_config, dry_run, install_default_system_packages=not no_default_packages
+    )
 
     if not dry_run:
         if any_failed:
             failed = [r for r in all_results if not r.success]
-            typer.secho("\n--- Some installations failed ---", fg=typer.colors.RED)
+            typer.secho("\n--- Some installations failed ---", fg=typer.colors.RED, err=True)
             for r in failed:
-                typer.secho(f"✗ {r.name}: {r.message}", fg=typer.colors.RED)
+                typer.secho(f"✗ {r.name}: {r.message}", fg=typer.colors.RED, err=True)
             raise typer.Exit(code=1)
         else:
             typer.secho("\n✓ All tools installed successfully.", fg=typer.colors.GREEN)
@@ -448,10 +474,10 @@ def create_venvs(ctx: typer.Context):
     results = run_tasks(concurrency_tasks)
     failed_tasks = [res for res in results if not res.success]
     if failed_tasks:
-        typer.secho("\n--- Some virtual environment operations failed ---", fg=typer.colors.RED)
+        typer.secho("\n--- Some virtual environment operations failed ---", fg=typer.colors.RED, err=True)
         for res in failed_tasks:
             error_message = f"✗ {res.name}: {res.message}"
-            typer.secho(error_message, fg=typer.colors.RED)
+            typer.secho(error_message, fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
     else:
         typer.secho("\nAll virtual environments created successfully.", fg=typer.colors.GREEN)
@@ -524,7 +550,7 @@ def ensure_db_user(ctx: typer.Context):
     # Check PostgreSQL is running
     typer.echo("Checking PostgreSQL status...")
     if not check_postgres_running():
-        typer.secho("✗ PostgreSQL is not running on localhost", fg=typer.colors.RED)
+        typer.secho("✗ PostgreSQL is not running on localhost", fg=typer.colors.RED, err=True)
         if system == "Darwin":
             typer.echo("Try: brew services start postgresql")
         elif system == "Linux":
@@ -540,7 +566,7 @@ def ensure_db_user(ctx: typer.Context):
         typer.echo(f"User '{username}' not found, creating...")
         success, error_msg = create_user(username, password, system)
         if not success:
-            typer.secho(f"✗ Failed to create user '{username}'", fg=typer.colors.RED)
+            typer.secho(f"✗ Failed to create user '{username}'", fg=typer.colors.RED, err=True)
             if system == "Linux" and "sudo" in error_msg.lower():
                 typer.echo("Manual instructions:")
                 typer.echo("  sudo -u postgres createuser -s odoo")
@@ -553,14 +579,16 @@ def ensure_db_user(ctx: typer.Context):
     # Test connection
     typer.echo("Testing connection...")
     if not verify_connection(host, username, password):
-        typer.secho("✗ Connection test failed", fg=typer.colors.RED)
+        typer.secho("✗ Connection test failed", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
     typer.secho("✓ Connection successful", fg=typer.colors.GREEN)
 
     typer.echo()
     typer.secho(f"✓ PostgreSQL user '{username}' is ready for Odoo development", fg=typer.colors.GREEN)
     typer.echo()
-    typer.secho("⚠️  WARNING: Using dev-only credentials (odoo:odoo). Never use in production!", fg=typer.colors.YELLOW)
+    typer.secho(
+        "⚠️  WARNING: Using dev-only credentials (odoo:odoo). Never use in production!", fg=typer.colors.YELLOW, err=True
+    )
 
 
 _STATUS_ICONS = {
@@ -572,6 +600,7 @@ _STATUS_ICONS = {
 
 @app.command()
 def doctor():
+    """Check local environment health and report issues."""
     code_root = get_code_root()
     groups = run_doctor(code_root)
 
@@ -603,3 +632,20 @@ def doctor():
 
     if has_fail:
         raise typer.Exit(code=1)
+
+
+def cli() -> None:
+    """Entry point wrapper with top-level exception handling."""
+    try:
+        app()
+    except Exception as e:
+        # typer.Exit and SystemExit are not caught by bare `except Exception`
+        # so this only catches unexpected errors
+        ctx = click.get_current_context(silent=True)
+        debug = ctx.obj.get("debug", False) if ctx and ctx.obj else False
+        if debug:
+            typer.secho(traceback.format_exc(), fg=typer.colors.RED, err=True)
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
+            typer.secho("Run with --debug for full stack trace.", err=True)
+        raise SystemExit(1) from e

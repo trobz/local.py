@@ -5,10 +5,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+import git
 import tomli
 from pydantic import ValidationError
 
-from .utils import ConfigModel
+from .utils import ConfigModel, get_repo_tasks
 
 
 class CheckStatus(Enum):
@@ -48,7 +49,7 @@ def check_config(code_root: Path) -> CheckResult:
         )
 
     try:
-        validated = ConfigModel(**raw)
+        ConfigModel(**raw)
     except ValidationError as e:
         errors = "; ".join(err["msg"] for err in e.errors())
         return CheckResult(
@@ -58,11 +59,10 @@ def check_config(code_root: Path) -> CheckResult:
             detail=errors,
         )
 
-    version_count = len(validated.versions)
     return CheckResult(
         name="Config file",
         status=CheckStatus.OK,
-        message=f"Valid — {version_count} version(s) defined",
+        message=f"Valid — Config file at {config_path}",
     )
 
 
@@ -335,6 +335,52 @@ def list_venvs(code_root: Path, versions: list[str]) -> list[CheckResult]:
     return results
 
 
+def check_repos(code_root: Path, repos_config: dict, versions: list[str]) -> list[CheckResult]:
+    """Check each configured repo's upstream status and dirty state."""
+    tasks = get_repo_tasks(versions, repos_config, code_root, repo_filter=None)
+    results = []
+    for task in tasks:
+        name = f"{task['repo_name']} ({task['version']})"
+        repo_path = task["repo_path"]
+        version = task["version"]
+
+        if not repo_path.exists():
+            results.append(CheckResult(name=name, status=CheckStatus.FAIL, message="not cloned"))
+            continue
+
+        try:
+            repo = git.Repo(repo_path)
+        except git.exc.InvalidGitRepositoryError:
+            results.append(CheckResult(name=name, status=CheckStatus.FAIL, message="invalid git repository"))
+            continue
+
+        # Fetch and compare SHAs
+        try:
+            repo.remotes.origin.fetch(version)
+            local_sha = repo.head.commit.hexsha
+            remote_sha = repo.remotes.origin.refs[version].commit.hexsha
+            behind = local_sha != remote_sha
+        except Exception as e:
+            results.append(CheckResult(name=name, status=CheckStatus.WARN, message=f"fetch failed: {e}"))
+            continue
+
+        dirty = repo.is_dirty(untracked_files=True)
+
+        if behind and dirty:
+            msg = "behind upstream, dirty"
+        elif behind:
+            msg = "behind upstream"
+        elif dirty:
+            msg = "dirty (uncommitted changes)"
+        else:
+            msg = "up to date"
+
+        status = CheckStatus.WARN if (behind or dirty) else CheckStatus.OK
+        results.append(CheckResult(name=name, status=status, message=msg))
+
+    return results
+
+
 def run_doctor(code_root: Path) -> dict[str, list[CheckResult]]:
     """Run all health checks and return grouped results."""
     groups: dict[str, list[CheckResult]] = {}
@@ -373,5 +419,12 @@ def run_doctor(code_root: Path) -> dict[str, list[CheckResult]]:
     # --- Virtual Environments ---
     versions = config.versions if config else []
     groups["Virtual Environments"] = list_venvs(code_root, versions)
+
+    # --- Repositories ---
+    if config:
+        repos_config = config.repos.model_dump()
+        groups["Repositories"] = check_repos(code_root, repos_config, versions)
+    else:
+        groups["Repositories"] = []
 
     return groups
