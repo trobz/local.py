@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
+from rich.console import Console
 from rich.progress import BarColumn, Progress, TextColumn
 
 
@@ -21,6 +22,7 @@ def run_tasks(tasks, max_workers: int = 4):
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        console=Console(stderr=True),
     ) as progress:
         overall = progress.add_task(f"[cyan]0/{total} done", total=total)
 

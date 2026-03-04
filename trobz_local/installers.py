@@ -151,7 +151,7 @@ def _run_package_install(cmd: list[str], packages: list[str]) -> bool:
     try:
         subprocess.run(full_cmd, check=True, text=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
-        typer.secho(f"Error installing packages: {e}", fg=typer.colors.RED)
+        typer.secho(f"Error installing packages: {e}", fg=typer.colors.RED, err=True)
         return False
     return True
 
@@ -165,11 +165,11 @@ def install_system_packages(packages: list[str], dry_run: bool = False, install_
 
     if config is None:
         if system == "Darwin":
-            typer.secho("Error: Homebrew is not installed. Please install it first.", fg=typer.colors.RED)
+            typer.secho("Error: Homebrew is not installed. Please install it first.", fg=typer.colors.RED, err=True)
         elif system == "Linux":
-            typer.secho(f"Error: Unsupported Linux distribution: {distro}", fg=typer.colors.RED)
+            typer.secho(f"Error: Unsupported Linux distribution: {distro}", fg=typer.colors.RED, err=True)
         else:
-            typer.secho(f"Error: Unsupported operating system: {system}", fg=typer.colors.RED)
+            typer.secho(f"Error: Unsupported operating system: {system}", fg=typer.colors.RED, err=True)
         return False
 
     cmd, default_packages = config
@@ -232,7 +232,9 @@ def setup_postgresql_repo() -> bool:
         # Get distribution codename (e.g. "jammy", "bookworm")
         lsb_release_path = shutil.which("lsb_release")
         if not lsb_release_path:
-            typer.secho("Warning: lsb_release not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            typer.secho(
+                "Warning: lsb_release not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW, err=True
+            )
             return True
 
         result = subprocess.run([lsb_release_path, "-cs"], check=True, capture_output=True, text=True)  # noqa: S603
@@ -240,12 +242,12 @@ def setup_postgresql_repo() -> bool:
 
         curl_path = shutil.which("curl")
         if not curl_path:
-            typer.secho("Warning: curl not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            typer.secho("Warning: curl not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW, err=True)
             return True
 
         gpg_path = shutil.which("gpg")
         if not gpg_path:
-            typer.secho("Warning: gpg not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            typer.secho("Warning: gpg not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW, err=True)
             return True
 
         # Download and import the official PGDG GPG key
@@ -272,7 +274,7 @@ def setup_postgresql_repo() -> bool:
 
         tee_path = shutil.which("tee")
         if not tee_path:
-            typer.secho("Warning: tee not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW)
+            typer.secho("Warning: tee not found, skipping PostgreSQL repo setup", fg=typer.colors.YELLOW, err=True)
             return True
 
         subprocess.run(  # noqa: S603
@@ -294,9 +296,10 @@ def setup_postgresql_repo() -> bool:
             f"Warning: Failed to setup PostgreSQL repository: {e}\n"
             "You may need to configure it manually if you need PostgreSQL.",
             fg=typer.colors.YELLOW,
+            err=True,
         )
     except Exception as e:
-        typer.secho(f"Warning: Unexpected error during PostgreSQL repo setup: {e}", fg=typer.colors.YELLOW)
+        typer.secho(f"Warning: Unexpected error during PostgreSQL repo setup: {e}", fg=typer.colors.YELLOW, err=True)
 
     return True  # Always succeeds — never fails the install-tools pipeline
 
@@ -327,6 +330,7 @@ def install_npm_packages(packages: list[str], dry_run: bool = False) -> list:
         typer.secho(
             "Error: npm is not installed. Please install Node.js first.",
             fg=typer.colors.RED,
+            err=True,
         )
         return [TaskResult(name="npm-check", success=False, message="npm is not installed")]
 

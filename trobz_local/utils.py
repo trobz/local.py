@@ -273,14 +273,14 @@ def get_code_root() -> Path:
 def get_uv_path():
     uv_path = shutil.which("uv")
     if not uv_path:
-        typer.secho("Error: uv is not installed. Please install uv first.", fg=typer.colors.RED)
+        typer.secho("Error: uv is not installed. Please install uv first.", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
     return uv_path
 
 
 def show_config_instructions():
     content = files("trobz_local").joinpath("assets/odoo_dev.toml").read_text()
-    typer.secho("Config file not found.", fg=typer.colors.YELLOW)
+    typer.secho("Config file not found.", fg=typer.colors.YELLOW, err=True)
     code_root = get_code_root()
     typer.echo(f"Please create {code_root}/config.toml with content like this:")
     typer.echo(content)
@@ -302,7 +302,7 @@ def get_config():
         with open(config_path, "rb") as f:
             raw_config = tomli.load(f)
     except tomli.TOMLDecodeError as e:
-        typer.secho(f"Error: Invalid TOML in {config_path}", fg=typer.colors.RED)
+        typer.secho(f"Error: Invalid TOML in {config_path}", fg=typer.colors.RED, err=True)
         typer.echo(str(e))
         raise typer.Exit(code=1) from e
 
@@ -310,7 +310,7 @@ def get_config():
         validated_config = ConfigModel(**raw_config)
     except ValidationError as e:
         for error in e.errors():
-            typer.secho(f"{error['msg']}", fg=typer.colors.RED)
+            typer.secho(f"{error['msg']}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from None
 
     return validated_config.model_dump()
@@ -339,7 +339,7 @@ def confirm_step(ctx: typer.Context, message: str, command: str):
     If in newcomer mode, prints a help message and asks for confirmation to proceed.
     """
     if ctx.obj.get("newcomer", False):
-        typer.secho(f"About to run: {command}", fg=typer.colors.BLUE)
+        typer.secho(f"About to run: {command}", fg=typer.colors.BLUE, err=True)
         rprint(message)
         if not typer.confirm("Do you want to proceed?"):
             raise typer.Abort()
