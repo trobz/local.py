@@ -16,9 +16,11 @@ npm = [
 name = "uv"
 url = "https://astral.sh/uv/install.sh"
 
-[[tools.script]]
+[[tools.github]]
 name = "nvm"
-url = "https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh"
+repo = "https://github.com/nvm-sh/nvm"
+version = "latest-release"
+script = "install.sh"
 
 system_packages = []
 
