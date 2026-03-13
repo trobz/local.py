@@ -1,0 +1,9 @@
+[tools]
+uv = [
+  "copier",
+  "oca-port",
+  "odooly",
+  "odoo-venv",
+  "odoo-addons-path"
+]
+system_packages = ["postgresql"]

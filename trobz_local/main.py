@@ -1,6 +1,7 @@
 import subprocess
 import urllib.request
 from enum import Enum
+from importlib.resources import files
 from pathlib import Path
 from typing import Annotated
 
@@ -609,7 +610,7 @@ def doctor():
 
 ALL_REPOS_URL = "https://raw.githubusercontent.com/trobz/odoo-addons-repos/main/all_repos_all_versions.toml"
 
-ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+_ASSETS = files("trobz_local").joinpath("assets")
 
 
 class ConfigProfile(str, Enum):
@@ -631,7 +632,7 @@ def generate_config(
             raise typer.Abort()
 
     if profile == ConfigProfile.odoo_minimal:
-        content = (ASSETS_DIR / "odoo_minimal.toml").read_text()
+        content = (_ASSETS / "odoo_minimal.toml").read_text()
     else:
         content = _build_oca_contributor_config()
 
@@ -649,5 +650,5 @@ def _build_oca_contributor_config() -> str:
         typer.secho(f"Failed to fetch repo list: {e}", fg=typer.colors.RED)
         raise typer.Exit(code=1) from e
 
-    local_content = (ASSETS_DIR / "oca_contributor.toml").read_text()
+    local_content = (_ASSETS / "oca_contributor.toml").read_text()
     return local_content + "\n" + remote_content
