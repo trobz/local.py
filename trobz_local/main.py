@@ -68,6 +68,7 @@ def main(
 
 @app.command()
 def init(ctx: typer.Context):
+    """Create the directory structure for local Odoo development."""
     _run_init(ctx)
 
 
