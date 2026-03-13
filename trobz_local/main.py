@@ -113,7 +113,7 @@ def _build_oca_contributor_config() -> str:
         raise typer.Exit(code=1) from e
 
     local_content = (_ASSETS / "oca_contributor.toml").read_text()
-    return local_content + "\n" + remote_content
+    return remote_content + "\n" + local_content
 
 
 @app.command()
