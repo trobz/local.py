@@ -572,6 +572,7 @@ _STATUS_ICONS = {
 
 @app.command()
 def doctor():
+    """Check the health of your local development environment."""
     code_root = get_code_root()
     groups = run_doctor(code_root)
 
