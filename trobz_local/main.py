@@ -620,13 +620,14 @@ class ConfigProfile(str, Enum):
 
 @app.command()
 def generate_config(
+    ctx: typer.Context,
     profile: Annotated[ConfigProfile, typer.Argument(help="Configuration profile to generate.")],
 ):
     """Generate a config.toml file from a predefined profile."""
     code_root = get_code_root()
     config_path = code_root / "config.toml"
 
-    if config_path.exists():
+    if config_path.exists() and ctx.obj.get("newcomer", True):
         typer.secho(f"Config file already exists: {config_path}", fg=typer.colors.YELLOW)
         if not typer.confirm("Overwrite?", default=False):
             raise typer.Abort()
