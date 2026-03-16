@@ -68,6 +68,7 @@ def main(
 
 @app.command()
 def init(ctx: typer.Context):
+    """Create the directory structure for local Odoo development."""
     _run_init(ctx)
 
 
@@ -572,6 +573,7 @@ _STATUS_ICONS = {
 
 @app.command()
 def doctor():
+    """Check the health of your local development environment."""
     code_root = get_code_root()
     groups = run_doctor(code_root)
 
