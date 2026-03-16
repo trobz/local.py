@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.7.1 (2026-03-16)
+
+### Bug Fixes
+
+- Add help description to init command
+  ([`2986e13`](https://github.com/trobz/local.py/commit/2986e131f11e616b8a7cd0fd69762af466bd0986))
+
+- **doctor**: Add help description to doctor command
+  ([`244e0b5`](https://github.com/trobz/local.py/commit/244e0b54deffd28ed53496263d16345dfd472399))
+
+
 ## v0.7.0 (2026-03-03)
 
 ### Bug Fixes
