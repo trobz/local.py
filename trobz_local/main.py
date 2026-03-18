@@ -429,6 +429,10 @@ def create_venvs(ctx: typer.Context):
         "create-venvs",
     )
 
+    # Arch Linux: OpenLDAP 2.5+ removed libldap_r.so but python-ldap<=3.4.3
+    # hardcodes it in setup.cfg. Create a compatibility symlink before building.
+    _ensure_libldap_r_symlink()
+
     uv_path = get_uv_path()
     odoo_dir_base = code_root / "odoo" / "odoo"
     create_launcher = config.get("create_launcher", True)
@@ -456,6 +460,30 @@ def create_venvs(ctx: typer.Context):
         raise typer.Exit(code=1)
     else:
         typer.secho("\nAll virtual environments created successfully.", fg=typer.colors.GREEN)
+
+
+def _ensure_libldap_r_symlink():
+    """On Arch, OpenLDAP 2.5+ removed libldap_r.so; create symlink for python-ldap<=3.4.3."""
+    os_info = get_os_info()
+    if os_info.get("distro") != "arch":
+        return
+
+    libldap_r = Path("/usr/lib/libldap_r.so")
+    if libldap_r.exists():
+        return
+
+    typer.echo("Arch Linux detected: creating libldap_r.so symlink for python-ldap compatibility...")
+    try:
+        subprocess.run(  # noqa: S603
+            ["sudo", "ln", "-sf", "/usr/lib/libldap.so", str(libldap_r)],  # noqa: S607
+            check=True,
+        )
+        typer.secho("✓ Created /usr/lib/libldap_r.so → libldap.so", fg=typer.colors.GREEN)
+    except subprocess.CalledProcessError:
+        typer.secho(
+            "✗ Failed to create symlink. Run manually:\n  sudo ln -sf /usr/lib/libldap.so /usr/lib/libldap_r.so",
+            fg=typer.colors.RED,
+        )
 
 
 def _create_venvs(
