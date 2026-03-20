@@ -1,4 +1,7 @@
 import subprocess
+import urllib.request
+from enum import Enum
+from importlib.resources import files
 from pathlib import Path
 from typing import Annotated
 
@@ -64,6 +67,53 @@ def main(
     ctx.obj["newcomer"] = newcomer and not yes
     if ctx.invoked_subcommand is None:
         _run_init(ctx)
+
+
+ALL_REPOS_URL = "https://raw.githubusercontent.com/trobz/odoo-addons-repos/main/all_repos_all_versions.toml"
+
+_ASSETS = files("trobz_local").joinpath("assets")
+
+
+class ConfigProfile(str, Enum):
+    odoo_minimal = "odoo-minimal"
+    oca_contributor = "oca-contributor"
+
+
+@app.command()
+def generate_config(
+    ctx: typer.Context,
+    profile: Annotated[ConfigProfile, typer.Argument(help="Configuration profile to generate.")],
+):
+    """Generate a config.toml file from a predefined profile."""
+    code_root = get_code_root()
+    config_path = code_root / "config.toml"
+
+    if config_path.exists() and ctx.obj.get("newcomer", True):
+        typer.secho(f"Config file already exists: {config_path}", fg=typer.colors.YELLOW)
+        if not typer.confirm("Overwrite?", default=False):
+            raise typer.Abort()
+
+    if profile == ConfigProfile.odoo_minimal:
+        content = (_ASSETS / "odoo_minimal.toml").read_text()
+    else:
+        content = _build_oca_contributor_config()
+
+    code_root.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(content)
+    typer.secho(f"Config written to {config_path}", fg=typer.colors.GREEN)
+
+
+def _build_oca_contributor_config() -> str:
+    typer.echo(f"Fetching OCA repo list from {ALL_REPOS_URL} ...")
+    try:
+        with urllib.request.urlopen(ALL_REPOS_URL, timeout=30) as resp:  # noqa: S310
+            remote_content = resp.read().decode()
+    except Exception as e:
+        typer.secho(f"Failed to fetch repo list: {e}", fg=typer.colors.RED)
+        raise typer.Exit(code=1) from e
+
+    local_content = (_ASSETS / "oca_contributor.toml").read_text()
+    return remote_content + "\n" + local_content
 
 
 @app.command()

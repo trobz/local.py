@@ -2,7 +2,6 @@ import os
 import platform
 import re
 import shutil
-from importlib.resources import files
 from pathlib import Path
 
 import git
@@ -233,11 +232,9 @@ def get_uv_path():
 
 
 def show_config_instructions():
-    content = files("trobz_local").joinpath("assets/odoo_dev.toml").read_text()
     typer.secho("Config file not found.", fg=typer.colors.YELLOW)
-    code_root = get_code_root()
-    typer.echo(f"Please create {code_root}/config.toml with content like this:")
-    typer.echo(content)
+    typer.echo("Generate one with: tlc generate-config <profile>")
+    typer.echo("Available profiles: odoo-minimal, oca-contributor")
 
 
 def get_config():
