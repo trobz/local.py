@@ -1,3 +1,4 @@
+import os
 import subprocess
 import urllib.request
 from enum import Enum
@@ -619,6 +620,24 @@ _STATUS_ICONS = {
     CheckStatus.WARN: "[yellow]!![/yellow]",
     CheckStatus.FAIL: "[red]FAIL[/red]",
 }
+
+
+@app.command()
+def edit_config():
+    """Open config.toml in your editor."""
+    code_root = get_code_root()
+    config_path = code_root / "config.toml"
+
+    if not config_path.exists():
+        typer.secho(f"Config file not found: {config_path}", fg=typer.colors.YELLOW)
+        typer.echo("Generate one first with: tlc generate-config <profile>")
+        raise typer.Exit(code=1)
+
+    editor = os.environ.get("EDITOR", "vi")
+    result = subprocess.run([editor, str(config_path)])  # noqa: S603
+    if result.returncode != 0:
+        typer.secho(f"Editor exited with code {result.returncode}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
 
 
 @app.command()
