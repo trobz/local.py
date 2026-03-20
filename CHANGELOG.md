@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-03-20)
+
+### Bug Fixes
+
+- Honor --yes flag in generate-config to skip overwrite prompt
+  ([`f48c434`](https://github.com/trobz/local.py/commit/f48c434ca5c3084106d7cce5b1f3debd78b4b93c))
+
+- Prepend remote content before local assets to fix TOML table scoping
+  ([`eef0fdf`](https://github.com/trobz/local.py/commit/eef0fdfc0e318dd92317c133c9bba093894d79d5))
+
+- Use importlib.resources for asset files so they work when installed as a package
+  ([`93c34e5`](https://github.com/trobz/local.py/commit/93c34e54e5717ff5af94f27944fb91a1ff937a68))
+
+### Features
+
+- Add generate-config command with odoo-minimal and oca-contributor profiles
+  ([`4674719`](https://github.com/trobz/local.py/commit/46747199c9352e17c4639f74ff80296e5ddb8731))
+
+### Refactoring
+
+- Move generate-config before init in command registration order
+  ([`a1a3320`](https://github.com/trobz/local.py/commit/a1a332093840c96fa2be7cb4f1c8abe3fdade2ca))
+
+
 ## v0.7.1 (2026-03-16)
 
 ### Bug Fixes
