@@ -22,6 +22,7 @@ from .installers import (
     install_uv_tools,
     setup_postgresql_repo,
 )
+from .odoo_dev_config import resolve_odoo_config, write_odoo_dev_config
 from .postgres import (
     check_postgres_running,
     check_user_exists,
@@ -655,3 +656,36 @@ def doctor():
 
     if has_fail:
         raise typer.Exit(code=1)
+
+
+def _get_cwd() -> Path:
+    return Path.cwd()
+
+
+def _get_global_config_dir() -> Path:
+    return Path.home() / ".claude"
+
+
+@app.command()
+def new(
+    ctx: typer.Context,
+    global_: bool = typer.Option(False, "--global", "-g", help="Write to ~/.claude/ instead of CWD/.claude/"),
+    force: bool = typer.Option(False, "--force", help="Skip overwrite confirmation."),
+):
+    """Detect Odoo layout and write .odoo-dev.json config."""
+    _run_new(ctx, global_=global_, force=force)
+
+
+def _run_new(ctx: typer.Context, *, global_: bool = False, force: bool = False):
+    import os
+
+    cwd = _get_cwd()
+    tlc_code_dir = os.environ.get("TLC_CODE_DIR")
+    code_dir = Path(tlc_code_dir) if tlc_code_dir else get_code_root()
+
+    target_dir = _get_global_config_dir() if global_ else cwd / ".claude"
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    odoo_block = resolve_odoo_config(cwd, code_dir)
+    write_odoo_dev_config(target_dir, odoo_block, force=force)
