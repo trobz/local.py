@@ -349,6 +349,102 @@ def install_npm_packages(packages: list[str], dry_run: bool = False) -> list:
     return run_tasks(tasks)
 
 
+def _install_skill(progress: Progress, task_id: TaskID, skill: str, npx_path: str):
+    progress.update(task_id, description=f"Installing {skill}...", total=100, completed=0)
+
+    try:
+        subprocess.run(  # noqa: S603
+            [npx_path, "-y", "skills", "add", "-g", "--all", skill],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        progress.update(task_id, description=f"[red]✗ Failed to install {skill}")
+        raise PackageInstallError(skill, e.stderr) from e
+
+    progress.update(task_id, description=f"✓ {skill} installed.", completed=100)
+
+
+def install_agent_skills(skills: list[str], dry_run: bool = False) -> list:
+    if not skills:
+        return []
+
+    npx_path = shutil.which("npx")
+    if not npx_path:
+        typer.secho(
+            "Error: npx is not installed. Please install Node.js first.",
+            fg=typer.colors.RED,
+        )
+        return [TaskResult(name="npx-check", success=False, message="npx is not installed")]
+
+    if dry_run:
+        typer.echo("\n[Skills - would be installed via npx skills install]")
+        for skill in skills:
+            typer.echo(f"  - {skill}")
+        return []
+
+    typer.secho("\n--- Installing Skills ---", fg=typer.colors.BLUE, bold=True)
+
+    tasks = []
+    for skill in skills:
+        tasks.append({
+            "name": skill,
+            "func": _install_skill,
+            "args": {"skill": skill, "npx_path": npx_path},
+        })
+
+    return run_tasks(tasks)
+
+
+def _update_skill(progress: Progress, task_id: TaskID, skill: str, npx_path: str):
+    progress.update(task_id, description=f"Updating {skill}...", total=100, completed=0)
+
+    try:
+        subprocess.run(  # noqa: S603
+            [npx_path, "-y", "skills", "update", skill],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        progress.update(task_id, description=f"[red]✗ Failed to update {skill}")
+        raise PackageInstallError(skill, e.stderr) from e
+
+    progress.update(task_id, description=f"✓ {skill} updated.", completed=100)
+
+
+def update_agent_skills(skills: list[str], dry_run: bool = False) -> list:
+    if not skills:
+        return []
+
+    npx_path = shutil.which("npx")
+    if not npx_path:
+        typer.secho(
+            "Error: npx is not installed. Please install Node.js first.",
+            fg=typer.colors.RED,
+        )
+        return [TaskResult(name="npx-check", success=False, message="npx is not installed")]
+
+    if dry_run:
+        typer.echo("\n[Skills - would be updated via npx skills update]")
+        for skill in skills:
+            typer.echo(f"  - {skill}")
+        return []
+
+    typer.secho("\n--- Updating Skills ---", fg=typer.colors.BLUE, bold=True)
+
+    tasks = []
+    for skill in skills:
+        tasks.append({
+            "name": skill,
+            "func": _update_skill,
+            "args": {"skill": skill, "npx_path": npx_path},
+        })
+
+    return run_tasks(tasks)
+
+
 def _install_uv_tool(progress: Progress, task_id: TaskID, tool: str, uv_path: str):
     progress.update(task_id, description=f"Installing {tool}...", total=100, completed=0)
 

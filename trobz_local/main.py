@@ -16,11 +16,13 @@ from rich.tree import Tree
 from .concurrency import TaskResult, run_tasks
 from .doctor import CheckStatus, run_doctor
 from .installers import (
+    install_agent_skills,
     install_npm_packages,
     install_scripts,
     install_system_packages,
     install_uv_tools,
     setup_postgresql_repo,
+    update_agent_skills,
 )
 from .postgres import (
     check_postgres_running,
@@ -441,6 +443,56 @@ def install_tools(
             raise typer.Exit(code=1)
         else:
             typer.secho("\n✓ All tools installed successfully.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def install_skills(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed without executing."),
+):
+    """Install AI agent skills specified in the skills field of config."""
+    config = get_config()
+    skills = config.get("tools", {}).get("skills", [])
+
+    if not skills:
+        code_root = get_code_root()
+        typer.echo(f"No skills found in config. Add skills to [tools] section in {code_root}/config.toml")
+        return
+
+    results = install_agent_skills(skills, dry_run)
+
+    if not dry_run:
+        failed = [r for r in results if not r.success]
+        if failed:
+            typer.secho("\n--- Some skill(s) installations failed ---", fg=typer.colors.RED)
+            for r in failed:
+                typer.secho(f"✗ {r.name}: {r.message}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        typer.secho("\n✓ All skills installed successfully.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def update_skills(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be updated without executing."),
+):
+    """Update AI agent skills specified in the skills field of config."""
+    config = get_config()
+    skills = config.get("tools", {}).get("skills", [])
+
+    if not skills:
+        code_root = get_code_root()
+        typer.echo(f"No skills found in config. Add skills to [tools] section in {code_root}/config.toml")
+        return
+
+    results = update_agent_skills(skills, dry_run)
+
+    if not dry_run:
+        failed = [r for r in results if not r.success]
+        if failed:
+            typer.secho("\n--- Some skill(s) updates failed ---", fg=typer.colors.RED)
+            for r in failed:
+                typer.secho(f"✗ {r.name}: {r.message}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        typer.secho("\n✓ All skills updated successfully.", fg=typer.colors.GREEN)
 
 
 @app.command()

@@ -182,6 +182,7 @@ class ToolsConfig(BaseModel):
     npm: list[str] = Field(default_factory=list)
     script: list[ScriptItem] = Field(default_factory=list)
     system_packages: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
 
     @field_validator("uv")
     @classmethod

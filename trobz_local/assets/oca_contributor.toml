@@ -7,3 +7,4 @@ uv = [
   "odoo-addons-path"
 ]
 system_packages = ["postgresql"]
+skills = ["https://github.com/trobz/public-skills", "git@github.com:trobz/skills.git"]
