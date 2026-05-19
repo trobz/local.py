@@ -222,3 +222,7 @@ repomix-output.xml
 .claude/
 .opencode/
 release-manifest.json
+
+# VIM files
+.*.sw?
+.*.un~
