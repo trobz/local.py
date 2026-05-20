@@ -1,8 +1,9 @@
 # Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
-_commit: v1.2.0
+_commit: v1.3.2
 _src_path: https://github.com/trobz/trobz-python-template.git
 author_email: doaminhtri8183@gmail.com
 author_username: trisdoan
+enable_docs_site: false
 enable_github_action: true
 package_name: trobz_local
 project_description: A developer tool for automating setup and management of local
