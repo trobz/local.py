@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.9.0 (2026-05-29)
+
+### Features
+
+- **new**: Add tlc new command to write .odoo-dev.json config
+  ([`7b376dc`](https://github.com/trobz/local.py/commit/7b376dc759b2733aef3d2883c2a54c975f2f54cb))
+
+
 ## v0.8.0 (2026-03-20)
 
 ### Bug Fixes

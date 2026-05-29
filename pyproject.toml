@@ -1,6 +1,6 @@
 [project]
 name = "trobz_local"
-version = "0.8.0"
+version = "0.9.0"
 description = "A developer tool for automating setup and management of local Odoo development environments."
 authors = [{name = "trisdoan", email = "doaminhtri8183@gmail.com"}]
 requires-python = ">=3.10"
