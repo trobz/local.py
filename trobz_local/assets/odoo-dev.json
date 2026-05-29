@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "required": ["odoo_source"],
+  "properties": {
+    "odoo_source": {
+      "type": "object",
+      "required": ["layout", "sourcePaths"],
+      "properties": {
+        "layout": {
+          "type": "string",
+          "enum": ["trobz", "c2c", "odoosh", "doodba", "local"]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+$"
+        },
+        "sourcePaths": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "enterprisePaths": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

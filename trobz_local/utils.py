@@ -152,7 +152,7 @@ class RepoConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_orgs(self):
-        for org, repos in self.model_extra.items():
+        for org, repos in (self.model_extra or {}).items():
             if not isinstance(repos, list):
                 raise InvalidRepoOrgConfigError(org)
             for entry in repos:
