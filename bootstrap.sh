@@ -113,12 +113,28 @@ install_trobz_local() {
     echo "trobz_local installed (CLI: tlc)"
 }
 
+# Install vercel-labs/skills (Claude Code skills)
+install_vercel_skills() {
+    if ! command -v nvm &>/dev/null; then
+        echo "Installing nvm..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
+    fi
+    if ! command -v npx &>/dev/null; then
+        echo "Installing node and related commands..."
+        . ~/.nvm/nvm.sh && nvm install --lts
+    fi
+    echo "Installing vercel-labs/skills..."
+    npx -y skills > /dev/null
+    echo "vercel-labs/skills installed"
+}
+
 # Main execution
 install_git
 install_gh
 install_uv
 setup_github_ssh
 install_trobz_local
+install_vercel_skills
 
 echo ""
 echo "=== Bootstrap complete ==="
@@ -128,6 +144,7 @@ echo "  ✓ git"
 echo "  ✓ gh (GitHub CLI)"
 echo "  ✓ uv"
 echo "  ✓ trobz_local (tlc command available)"
+echo "  ✓ nvm, node, and vercel-labs/skills (AI agent skills)"
 echo ""
 echo "Next steps:"
 echo ""
