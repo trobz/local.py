@@ -186,6 +186,11 @@ def pull_repos(  # noqa: C901
         ),
     ] = None,
     dry_run: bool = typer.Option(False, "--dry-run", help="Prints actions without running."),
+    full_history: bool = typer.Option(
+        False,
+        "--full-history",
+        help="Fetch full commit history instead of shallow clone (depth=1).",
+    ),
 ):
     """
     Pull/clone Odoo and OCA repos based on config
@@ -234,7 +239,7 @@ def pull_repos(  # noqa: C901
         concurrency_tasks.append({
             "name": f"{repo_info['repo_name']} ({repo_info['version']})",
             "func": _pull_repo,
-            "args": {"repo_info": repo_info},
+            "args": {"repo_info": repo_info, "full_history": full_history},
         })
 
     results = run_tasks(concurrency_tasks)
@@ -288,7 +293,7 @@ def _get_tasks(odoo_versions, repos_config, code_root, repo_filter):
     return tasks
 
 
-def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict):
+def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict, full_history: bool = False):
     repo_name = repo_info["repo_name"]
     repo_path = repo_info["repo_path"]
     repo_url = repo_info["repo_url"]
@@ -299,12 +304,16 @@ def _pull_repo(progress: Progress, task_id: TaskID, repo_info: dict):
         if not repo_path.exists():
             progress.update(task_id, description=f"Cloning {repo_name} ({version})")
             repo_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Calculate depth based on full_history flag
+            depth = None if full_history else 1
+
             git.Repo.clone_from(
                 repo_url,
                 to_path=repo_path,
                 branch=version,
                 progress=GitProgress(progress, task_id, f"Cloning {repo_name} {version}"),  # ty: ignore[invalid-argument-type]
-                depth=1,
+                depth=depth,
             )
         else:
             progress.update(task_id, description=f"Fetching {repo_name} ({version})")

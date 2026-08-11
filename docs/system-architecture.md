@@ -139,7 +139,9 @@ pull-repos command
     │       git checkout {branch}
     │       git reset --hard origin/{branch}
     │     else:
-    │       git clone --depth=1 --branch={branch} {url} {path}
+    │       # Depth controlled by --full-history flag
+    │       depth = None if full_history else 1
+    │       git clone --depth={depth} --branch={branch} {url} {path}
     │     with GitProgress callback
     │
     ├─ Aggregate TaskResults

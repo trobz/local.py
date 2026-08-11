@@ -144,6 +144,78 @@ def test_pull_repo_handles_git_exception(tmp_path, mock_git_repo_calls):
     assert found_error_description
 
 
+def test_pull_repo_clones_with_shallow_clone_by_default(tmp_path, mock_git_repo_calls, mock_main_git_progress):
+    """Test that repos are cloned with depth=1 by default."""
+    mock_clone_from, _ = mock_git_repo_calls
+    progress_mock = MagicMock(spec=Progress)
+
+    repo_path = tmp_path / "code" / "odoo" / "odoo" / "16.0"
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+
+    repo_info = {
+        "repo_name": "odoo",
+        "repo_path": repo_path,
+        "repo_url": ODOO_URLS["odoo"],
+        "version": "16.0",
+    }
+
+    # Call without full_history parameter (default behavior)
+    _pull_repo(progress_mock, task, repo_info)
+
+    # Verify depth=1 is used
+    mock_clone_from.assert_called_once()
+    call_kwargs = mock_clone_from.call_args.kwargs
+    assert call_kwargs["depth"] == 1
+
+
+def test_pull_repo_clones_with_full_history_when_flag_set(tmp_path, mock_git_repo_calls, mock_main_git_progress):
+    """Test that repos are cloned with full history when --full-history flag is used."""
+    mock_clone_from, _ = mock_git_repo_calls
+    progress_mock = MagicMock(spec=Progress)
+
+    repo_path = tmp_path / "code" / "odoo" / "odoo" / "16.0"
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+
+    repo_info = {
+        "repo_name": "odoo",
+        "repo_path": repo_path,
+        "repo_url": ODOO_URLS["odoo"],
+        "version": "16.0",
+    }
+
+    # Call with full_history=True
+    _pull_repo(progress_mock, task, repo_info, full_history=True)
+
+    # Verify depth=None is used (full clone)
+    mock_clone_from.assert_called_once()
+    call_kwargs = mock_clone_from.call_args.kwargs
+    assert call_kwargs["depth"] is None
+
+
+def test_pull_repo_update_existing_ignores_full_history_flag(tmp_path, mock_git_repo_calls, mock_main_git_progress):
+    """Test that existing repo updates ignore the full_history flag."""
+    _, mock_repo_class = mock_git_repo_calls
+    progress_mock = MagicMock(spec=Progress)
+
+    repo_path = tmp_path / "code" / "odoo" / "odoo" / "16.0"
+    repo_path.mkdir(parents=True, exist_ok=True)
+
+    repo_info = {
+        "repo_name": "odoo",
+        "repo_path": repo_path,
+        "repo_url": ODOO_URLS["odoo"],
+        "version": "16.0",
+    }
+
+    # Call with full_history=True on existing repo
+    _pull_repo(progress_mock, task, repo_info, full_history=True)
+
+    # Verify fetch/reset was called (not clone)
+    mock_repo_instance = mock_repo_class.return_value
+    mock_repo_instance.remotes.origin.fetch.assert_called_once_with("16.0")
+    mock_repo_instance.git.reset.assert_called_once_with("--hard", "origin/16.0")
+
+
 def test_get_tasks_generates_correct_list(mock_config, tmp_path):
     odoo_versions = ["16.0", "17.0"]
     repos_config = {"odoo": ["odoo"], "oca": ["server-tools"]}
